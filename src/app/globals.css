@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --surface-bg: radial-gradient(circle at 20% 15%, #dbeafe 0%, #e0f2fe 24%, #f8fafc 58%, #f1f5f9 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--surface-bg);
+  font-family: "Avenir Next", "Segoe UI Variable", "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+code,
+.mono {
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.card-glass {
+  backdrop-filter: blur(10px);
+}
+
+.leaflet-container {
+  background: #0b1120;
+  font-family: "Avenir Next", "Segoe UI Variable", "Segoe UI", sans-serif;
+}

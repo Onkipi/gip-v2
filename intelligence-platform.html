@@ -1,0 +1,2755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Geopolitical Intelligence Platform — GIP v2.0</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+:root {
+  --bg:       #060c1a;
+  --surface:  #0d1526;
+  --surface2: #131f35;
+  --surface3: #1a2a42;
+  --border:   #1e3050;
+  --border2:  #243a5a;
+  --cyan:     #22d3ee;
+  --cyan2:    #0e7490;
+  --blue:     #3b82f6;
+  --navy:     #1d4ed8;
+  --green:    #10b981;
+  --amber:    #f59e0b;
+  --red:      #ef4444;
+  --red2:     #dc2626;
+  --text1:    #f1f5f9;
+  --text2:    #94a3b8;
+  --text3:    #64748b;
+  --r:        8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text1);font-size:13px}
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+#app{display:flex;flex-direction:column;height:100vh}
+#header{flex-shrink:0;height:58px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:14px;z-index:100}
+#body{flex:1;display:flex;min-height:0}
+#sidebar{flex-shrink:0;width:180px;background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:12px 8px}
+#main{flex:1;overflow-y:auto;padding:20px;position:relative}
+#main:has(#tab-mapview.active){padding:0;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.logo{font-size:11px;font-weight:700;letter-spacing:.15em;color:var(--cyan);text-transform:uppercase;white-space:nowrap}
+.logo span{color:var(--text2);font-weight:400}
+#risk-dial{width:52px;height:30px;flex-shrink:0}
+.hstat{display:flex;flex-direction:column;gap:1px}
+.hstat-label{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em}
+.hstat-val{font-size:14px;font-weight:700;color:var(--text1)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.hfill{flex:1}
+.hbadge{font-size:9px;font-weight:700;letter-spacing:.1em;padding:3px 8px;border-radius:20px;border:1px solid var(--cyan2);color:var(--cyan);background:rgba(14,116,144,.12)}
+
+/* ── Sidebar nav ─────────────────────────────────────────────────────────── */
+.nav-item{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:6px;cursor:pointer;color:var(--text2);transition:.15s;font-size:11.5px;font-weight:500;letter-spacing:.02em;margin-bottom:2px}
+.nav-item:hover{background:var(--surface3);color:var(--text1)}
+.nav-item.active{background:rgba(34,211,238,.12);color:var(--cyan);border:1px solid rgba(34,211,238,.25)}
+.nav-item svg{flex-shrink:0;opacity:.7}
+.nav-section{font-size:9px;font-weight:700;color:var(--text3);letter-spacing:.15em;text-transform:uppercase;padding:14px 10px 6px}
+
+/* ── Panels ─────────────────────────────────────────────────────────────── */
+.panel{display:none}
+.panel.active{display:block}
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px}
+.card-title{font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--text3);margin-bottom:12px}
+.card-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+
+/* ── Metric cards ────────────────────────────────────────────────────────── */
+.mcard{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.mcard-label{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px}
+.mcard-val{font-size:26px;font-weight:800;line-height:1}
+.mcard-sub{font-size:10px;color:var(--text2);margin-top:4px}
+.mcard-bar{height:3px;border-radius:2px;background:var(--border2);margin-top:10px;overflow:hidden}
+.mcard-fill{height:100%;border-radius:2px;transition:width .8s ease}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--surface3);color:var(--cyan);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:9px 12px;text-align:left;border-bottom:1px solid var(--border2)}
+td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02);color:var(--text1)}
+
+/* ── Probability bars ────────────────────────────────────────────────────── */
+.prob-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.prob-label{font-size:11px;font-weight:600;color:var(--text1);margin-bottom:4px}
+.prob-horizon{font-size:9px;color:var(--text3);margin-bottom:10px}
+.prob-p50{font-size:28px;font-weight:800;color:var(--cyan);line-height:1;margin-bottom:8px}
+.band-wrap{position:relative;height:20px;background:var(--border);border-radius:10px;overflow:hidden;margin-bottom:6px}
+.band-fill{position:absolute;top:0;bottom:0;border-radius:10px;transition:all .8s ease}
+.band-p50{position:absolute;top:0;bottom:0;width:3px;background:#fff;border-radius:2px;transition:left .8s ease}
+.band-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--text3)}
+.badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.05em}
+.badge-high{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.3)}
+.badge-med{background:rgba(245,158,11,.15);color:#fcd34d;border:1px solid rgba(245,158,11,.3)}
+.badge-low{background:rgba(16,185,129,.15);color:#6ee7b7;border:1px solid rgba(16,185,129,.3)}
+
+/* ── Buttons / controls ──────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.05em;transition:.15s}
+.btn-cyan{background:var(--cyan2);color:#fff}
+.btn-cyan:hover{background:var(--cyan);color:#000}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2)}
+.btn-ghost:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn-sm{padding:5px 10px;font-size:10px}
+.btn-group{display:flex;gap:6px;flex-wrap:wrap}
+
+/* ── Sliders ──────────────────────────────────────────────────────────────── */
+.slider-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.slider-row label{font-size:11px;color:var(--text2);width:160px;flex-shrink:0}
+.slider-row input[type=range]{flex:1;accent-color:var(--cyan);height:4px}
+.slider-val{font-size:11px;font-weight:700;color:var(--cyan);width:36px;text-align:right;flex-shrink:0}
+.toggle-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.toggle-row label{font-size:11px;color:var(--text2);flex:1}
+.toggle{position:relative;width:36px;height:18px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.slider-bg{position:absolute;inset:0;border-radius:9px;background:var(--border2);cursor:pointer;transition:.2s}
+.toggle input:checked + .slider-bg{background:var(--cyan2)}
+.slider-bg::before{content:'';position:absolute;width:12px;height:12px;left:3px;top:3px;border-radius:50%;background:#fff;transition:.2s}
+.toggle input:checked + .slider-bg::before{transform:translateX(18px)}
+
+/* ── Charts ──────────────────────────────────────────────────────────────── */
+.chart-wrap{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:14px}
+.chart-title{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+svg text{font-family:'Segoe UI',system-ui,sans-serif}
+
+/* ── Progress bar ────────────────────────────────────────────────────────── */
+.progress-wrap{background:var(--border);border-radius:4px;overflow:hidden;height:8px;margin:8px 0}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--cyan2),var(--cyan));border-radius:4px;transition:width .1s}
+
+/* ── Signal dot ──────────────────────────────────────────────────────────── */
+.sig-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.sig-green{background:var(--green)}
+.sig-amber{background:var(--amber)}
+.sig-red{background:var(--red)}
+
+/* ── XAI waterfall ───────────────────────────────────────────────────────── */
+.attr-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.attr-label{font-size:11px;color:var(--text2);width:200px;flex-shrink:0}
+.attr-bar-wrap{flex:1;position:relative;height:16px}
+.attr-bar{position:absolute;top:0;bottom:0;border-radius:3px;transition:all .6s ease}
+.attr-pos{background:rgba(239,68,68,.6);left:50%}
+.attr-neg{background:rgba(16,185,129,.6);right:50%}
+.attr-zero{position:absolute;left:50%;width:1px;top:0;bottom:0;background:var(--border2)}
+.attr-val{font-size:10px;font-weight:700;width:44px;text-align:right;flex-shrink:0}
+.attr-pos-text{color:#fca5a5}
+.attr-neg-text{color:#6ee7b7}
+
+/* ── Event chain ─────────────────────────────────────────────────────────── */
+.chain-node{cursor:pointer;transition:.15s}
+.chain-node:hover .cn-bg{stroke:var(--cyan);stroke-width:2}
+.chain-step{display:flex;align-items:flex-start;gap:10px;padding:10px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px;cursor:pointer;transition:.15s}
+.chain-step:hover{border-color:var(--cyan2);background:rgba(34,211,238,.04)}
+.chain-step.active{border-color:var(--cyan);background:rgba(34,211,238,.08)}
+.cs-num{font-size:9px;font-weight:800;width:20px;height:20px;border-radius:50%;background:var(--cyan2);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cs-title{font-size:11px;font-weight:600;color:var(--text1);margin-bottom:2px}
+.cs-meta{font-size:10px;color:var(--text3)}
+.cs-prob{font-size:12px;font-weight:700;color:var(--cyan);margin-left:auto;flex-shrink:0}
+
+/* ── Scenario comparison ─────────────────────────────────────────────────── */
+.sc-col{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:12px}
+.sc-name{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+.sc-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.sc-row:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.sc-label{font-size:10px;color:var(--text2)}
+.sc-val{font-size:13px;font-weight:800;color:var(--cyan)}
+.delta{font-size:10px;font-weight:700;margin-left:4px}
+.delta-up{color:#fca5a5}
+.delta-down{color:#6ee7b7}
+.delta-neu{color:var(--text3)}
+
+/* ── Roadmap ─────────────────────────────────────────────────────────────── */
+.phase-card{border-left:3px solid var(--cyan2);padding-left:14px;margin-bottom:20px}
+.phase-title{font-size:13px;font-weight:700;color:var(--cyan);margin-bottom:2px}
+.phase-sub{font-size:10px;color:var(--text3);margin-bottom:8px}
+.phase-item{font-size:11px;color:var(--text2);padding:3px 0;padding-left:12px;position:relative}
+.phase-item::before{content:'›';position:absolute;left:0;color:var(--cyan2)}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--cyan2)}
+
+/* ── Live ticker ─────────────────────────────────────────────────────────── */
+#ticker{flex-shrink:0;height:28px;background:rgba(14,116,144,.12);border-top:1px solid var(--border);overflow:hidden;display:flex;align-items:center;padding:0 14px;gap:10px}
+.tick-label{font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--cyan);text-transform:uppercase;flex-shrink:0}
+.tick-scroll{flex:1;overflow:hidden;position:relative;height:100%}
+.tick-inner{display:flex;gap:40px;align-items:center;height:100%;position:absolute;white-space:nowrap;animation:scroll-left 40s linear infinite}
+@keyframes scroll-left{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.tick-event{font-size:10px;color:var(--text2)}
+.tick-event span{color:var(--text1);font-weight:600}
+
+/* ── Fan chart ───────────────────────────────────────────────────────────── */
+#fan-canvas{width:100%;height:220px;display:block}
+
+/* ── Tooltip ─────────────────────────────────────────────────────────────── */
+.tooltip{position:fixed;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--text1);pointer-events:none;z-index:9999;max-width:260px;display:none}
+
+/* ── Monte Carlo status ──────────────────────────────────────────────────── */
+.mc-status{font-size:11px;color:var(--text2);padding:8px 0}
+.mc-result-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px}
+.mc-outcome{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px;text-align:center}
+.mc-outcome-name{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.mc-outcome-pct{font-size:22px;font-weight:800}
+
+/* ── Map View Layout ─────────────────────────────────────────────────────── */
+#tab-mapview{display:none;height:100%;overflow:hidden}
+#tab-mapview.active{display:flex!important;flex-direction:column;height:100%}
+.map-header{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface)}
+.map-header-title{font-size:14px;font-weight:700;color:var(--text1)}
+.map-header-sub{font-size:10px;color:var(--text3);margin-top:1px}
+.map-body{flex:1;display:flex;min-height:0;overflow:hidden}
+/* feed panel */
+.map-feed{width:310px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--surface);overflow:hidden}
+.map-feed-top{flex-shrink:0;padding:10px 10px 6px}
+.feed-search{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text1);padding:7px 10px;border-radius:5px;font-size:11px;outline:none;margin-bottom:7px;font-family:inherit}
+.feed-search::placeholder{color:var(--text3)}
+.feed-search:focus{border-color:var(--cyan2)}
+.feed-filters{display:flex;gap:5px;margin-bottom:7px}
+.feed-select{flex:1;background:var(--surface3);border:1px solid var(--border2);color:var(--text2);padding:5px 6px;border-radius:4px;font-size:10px;outline:none}
+.feed-sev-row{display:flex;gap:4px;margin-bottom:6px}
+.sev-btn{flex:1;text-align:center;padding:4px 0;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.05em;cursor:pointer;transition:.15s;border:1px solid transparent}
+.sev-high{background:rgba(239,68,68,.15);color:#fca5a5;border-color:rgba(239,68,68,.3)}
+.sev-med{background:rgba(245,158,11,.15);color:#fcd34d;border-color:rgba(245,158,11,.3)}
+.sev-norm{background:rgba(16,185,129,.15);color:#6ee7b7;border-color:rgba(16,185,129,.3)}
+.feed-meta{display:flex;justify-content:space-between;padding:0 0 5px;font-size:10px;color:var(--text3)}
+#feed-list{flex:1;overflow-y:auto;padding:0 6px 8px}
+/* incident cards */
+.inc-card{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 10px 8px;margin-bottom:6px;cursor:pointer;transition:.15s}
+.inc-card:hover{border-color:var(--border2);background:var(--surface3)}
+.inc-active{border-color:var(--cyan2)!important;background:rgba(34,211,238,.05)!important}
+.inc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.inc-loc{font-size:10px;color:var(--text2)}
+.inc-sev{font-size:8px;font-weight:700;padding:2px 6px;border-radius:8px;letter-spacing:.05em}
+.inc-headline{font-size:11px;color:var(--text1);font-weight:500;margin-bottom:5px;line-height:1.4}
+.inc-meta{display:flex;justify-content:space-between;margin-bottom:5px}
+.inc-meta span{font-size:9px}
+.inc-tier{font-weight:700}
+.inc-bar{height:2px;background:var(--border);border-radius:1px;overflow:hidden}
+/* leaflet map */
+#gip-map{flex:1;min-width:0;z-index:1}
+.gip-tip .leaflet-tooltip{background:none;border:none;box-shadow:none;padding:0}
+/* right intel panel */
+.map-intel{width:300px;flex-shrink:0;display:flex;flex-direction:column;border-left:1px solid var(--border);background:var(--surface);overflow-y:auto}
+.intel-section{border-bottom:1px solid var(--border);padding:12px}
+.intel-section-title{font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+.ev-tabs{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
+.ev-tab{font-size:9px;font-weight:700;padding:3px 7px;border-radius:10px;cursor:pointer;border:1px solid var(--border2);color:var(--text2);transition:.15s}
+.ev-tab:hover{border-color:var(--cyan2);color:var(--cyan)}
+.ev-tab-active{background:rgba(34,211,238,.12);border-color:var(--cyan2);color:var(--cyan)}
+.ev-item{padding:6px 0;border-bottom:1px solid rgba(30,48,80,.5)}
+.ev-item:last-child{border-bottom:none}
+.ev-headline{font-size:10px;color:var(--text1);margin-bottom:2px;line-height:1.4}
+.ev-source{font-size:9px;color:var(--text3)}
+.rec-action{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:9px 10px;margin-bottom:6px}
+.rec-title{font-size:11px;font-weight:700;color:var(--text1);margin-bottom:3px}
+.rec-body{font-size:10px;color:var(--text2);line-height:1.4}
+
+/* Override .panel.active for map view — needs flex not block */
+#tab-mapview.panel.active{display:flex!important}
+
+/* ── Expandable signal rows ───────────────────────────────────────────────── */
+.sig-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:.15s}
+.sig-row:hover{background:rgba(34,211,238,.03)}
+.sig-expand-icon{font-size:9px;color:var(--text3);margin-left:auto;transition:transform .2s}
+.sig-events{display:none;background:var(--bg);border-radius:5px;margin:4px 0 6px;overflow:hidden}
+.sig-events.open{display:block}
+.sig-event-row{display:grid;grid-template-columns:1fr auto;gap:6px;padding:7px 10px;border-bottom:1px solid rgba(30,48,80,.5);font-size:10px}
+.sig-event-row:last-child{border-bottom:none}
+.sig-event-title{color:var(--text1);font-weight:500;margin-bottom:2px}
+.sig-event-meta{display:flex;gap:8px;flex-wrap:wrap}
+.sig-event-meta span{color:var(--text3)}
+.sig-event-meta .conf{color:var(--cyan)}
+.sig-event-meta .impact{color:var(--amber)}
+.sig-event-meta .utc{color:var(--text3)}
+
+/* ── Driver causal bars ───────────────────────────────────────────────────── */
+.driver-row{margin-bottom:10px}
+.driver-header{display:flex;justify-content:space-between;margin-bottom:3px}
+.driver-label{font-size:11px;color:var(--text1)}
+.driver-cause{font-size:10px;font-weight:700;color:var(--red);background:rgba(239,68,68,.08);padding:1px 6px;border-radius:8px}
+.driver-cause.neg{color:var(--green);background:rgba(16,185,129,.08)}
+
+/* ── Truth Tracking ───────────────────────────────────────────────────────── */
+.truth-stat{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center}
+.truth-stat-val{font-size:28px;font-weight:800;line-height:1}
+.truth-stat-label{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-top:4px}
+.outcome-yes{color:var(--green);font-weight:700}
+.outcome-no{color:var(--red);font-weight:700}
+.outcome-pending{color:var(--amber);font-weight:600;font-style:italic}
+.brier-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:6px}
+.brier-fill{height:100%;border-radius:3px}
+
+/* ── Ask Intel Q&A ────────────────────────────────────────────────────────── */
+.qa-history{min-height:200px;max-height:420px;overflow-y:auto;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px}
+.qa-msg{margin-bottom:12px}
+.qa-user{text-align:right}
+.qa-bubble{display:inline-block;padding:8px 13px;border-radius:10px;font-size:12px;max-width:85%;line-height:1.5}
+.qa-user .qa-bubble{background:var(--cyan2);color:#fff;border-bottom-right-radius:3px}
+.qa-intel .qa-bubble{background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-bottom-left-radius:3px}
+.qa-label{font-size:9px;font-weight:700;letter-spacing:.1em;margin-bottom:4px}
+.qa-user .qa-label{color:var(--cyan);text-transform:uppercase;text-align:right}
+.qa-intel .qa-label{color:var(--text3);text-transform:uppercase}
+.qa-input-row{display:flex;gap:8px}
+.qa-input{flex:1;background:var(--surface2);border:1px solid var(--border2);color:var(--text1);padding:10px 13px;border-radius:6px;font-size:12px;outline:none;font-family:inherit}
+.qa-input:focus{border-color:var(--cyan2)}
+.qa-send{padding:10px 18px;background:var(--cyan2);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;transition:.15s;letter-spacing:.04em}
+.qa-send:hover{background:var(--cyan);color:#000}
+.qa-suggestion{display:inline-block;padding:4px 10px;margin:3px 3px 3px 0;border:1px solid var(--border2);border-radius:12px;font-size:10px;color:var(--text2);cursor:pointer;transition:.15s}
+.qa-suggestion:hover{border-color:var(--cyan2);color:var(--cyan)}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ═══════════ HEADER ═══════════════════════════════════════════════════ -->
+<div id="header">
+  <div class="logo">GIP<span> v2.0</span></div>
+  <svg id="risk-dial" viewBox="0 0 52 30"></svg>
+  <div class="hstat"><div class="hstat-label">Risk Score</div><div class="hstat-val" id="h-risk">--</div></div>
+  <div class="hstat"><div class="hstat-label">Scenario</div><div class="hstat-val" id="h-scenario" style="font-size:11px;text-transform:uppercase">Baseline</div></div>
+  <div class="hstat"><div class="hstat-label">Confidence</div><div class="hstat-val" id="h-conf" style="color:var(--green)">--</div></div>
+  <div class="hfill"></div>
+  <div class="dot" id="conn-dot"></div>
+  <span style="font-size:10px;color:var(--text2)" id="conn-label">Live</span>
+  <div class="hbadge">REAL-TIME</div>
+  <div style="font-size:10px;color:var(--text3)" id="last-update">--</div>
+</div>
+
+<!-- ═══════════ BODY ═══════════════════════════════════════════════════ -->
+<div id="body">
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="nav-section">Intelligence</div>
+  <div class="nav-item" onclick="showTab('mapview')">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+    Map View
+  </div>
+  <div class="nav-item active" onclick="showTab('overview')">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    Overview
+  </div>
+  <div class="nav-item" onclick="showTab('predictions')">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Predictions
+  </div>
+  <div class="nav-item" onclick="showTab('montecarlo')">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    Monte Carlo
+  </div>
+  <div class="nav-item" onclick="showTab('whatif')">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
+    What-If Engine
+  </div>
+  <div class="nav-item" onclick="showTab('chains')">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+    Event Chains
+  </div>
+  <div class="nav-item" onclick="showTab('xai')">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
+    Explainability
+  </div>
+  <div class="nav-item" onclick="showTab('truth')">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    Truth Tracker
+  </div>
+  <div class="nav-item" onclick="showTab('ask')">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    Ask Intel
+  </div>
+  <div class="nav-section">System</div>
+  <div class="nav-item" onclick="showTab('roadmap')">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    Roadmap
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div id="main">
+
+<!-- ══════════ OVERVIEW ══════════════════════════════════════════════════ -->
+<div id="tab-overview" class="panel active">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div>
+      <h2 style="font-size:16px;font-weight:700;color:var(--text1)">Intelligence Overview</h2>
+      <p style="font-size:11px;color:var(--text3);margin-top:2px">Real-time geopolitical risk assessment · Bayesian-weighted Monte Carlo</p>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-ghost btn-sm" onclick="setScenario('baseline')">Baseline</button>
+      <button class="btn btn-ghost btn-sm" onclick="setScenario('crisis')">Crisis</button>
+      <button class="btn btn-ghost btn-sm" onclick="setScenario('extreme')">Extreme</button>
+    </div>
+  </div>
+
+  <div class="grid4" id="metric-cards">
+    <div class="mcard">
+      <div class="mcard-label">Geopolitical Tension</div>
+      <div class="mcard-val" id="m-geo" style="color:var(--amber)">--</div>
+      <div class="mcard-sub">Index 0–100</div>
+      <div class="mcard-bar"><div class="mcard-fill" id="m-geo-bar" style="background:var(--amber)"></div></div>
+    </div>
+    <div class="mcard">
+      <div class="mcard-label">Market Stress</div>
+      <div class="mcard-val" id="m-mkt" style="color:var(--red)">--</div>
+      <div class="mcard-sub">Index 0–100</div>
+      <div class="mcard-bar"><div class="mcard-fill" id="m-mkt-bar" style="background:var(--red)"></div></div>
+    </div>
+    <div class="mcard">
+      <div class="mcard-label">Anomaly Score</div>
+      <div class="mcard-val" id="m-anom" style="color:var(--cyan)">--</div>
+      <div class="mcard-sub">Spike detection</div>
+      <div class="mcard-bar"><div class="mcard-fill" id="m-anom-bar" style="background:var(--cyan2)"></div></div>
+    </div>
+    <div class="mcard">
+      <div class="mcard-label">Composite Risk</div>
+      <div class="mcard-val" id="m-risk" style="color:var(--text1)">--</div>
+      <div class="mcard-sub" id="m-risk-level">--</div>
+      <div class="mcard-bar"><div class="mcard-fill" id="m-risk-bar" style="background:var(--cyan)"></div></div>
+    </div>
+  </div>
+
+  <div class="grid2" style="margin-top:0">
+    <div class="card">
+      <div class="card-title">Active Signal Layers</div>
+      <div id="signal-health"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Top Prediction Drivers</div>
+      <div id="top-drivers"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Architecture Gap Assessment — Current vs. Enhanced</div>
+    <table>
+      <thead><tr><th>Gap Area</th><th>Current State</th><th>Enhanced Target</th><th>Priority</th></tr></thead>
+      <tbody>
+        <tr><td>Monte Carlo Depth</td><td style="color:var(--red2)">1,200–2,400 iterations</td><td style="color:var(--green)">10,000+ with worker threads</td><td><span class="badge badge-high">CRITICAL</span></td></tr>
+        <tr><td>Sentiment Analysis</td><td style="color:var(--red2)">Keyword word-list scorer</td><td style="color:var(--green)">Transformer NLP + NER</td><td><span class="badge badge-high">HIGH</span></td></tr>
+        <tr><td>What-If Engine</td><td style="color:var(--red2)">Static client-side shifts</td><td style="color:var(--green)">Full server-side re-computation</td><td><span class="badge badge-high">CRITICAL</span></td></tr>
+        <tr><td>P50 Percentile</td><td style="color:var(--red2)">Not computed (P10/P90 only)</td><td style="color:var(--green)">P10 / P50 / P90 all exposed</td><td><span class="badge badge-high">HIGH</span></td></tr>
+        <tr><td>Event Chain Depth</td><td style="color:var(--amber)">3-step single pathway</td><td style="color:var(--green)">N-step DAG, top-5 pathways</td><td><span class="badge badge-med">MEDIUM</span></td></tr>
+        <tr><td>Forecast Horizons</td><td style="color:var(--amber)">72h escalation index only</td><td style="color:var(--green)">6h / 24h / 7d / 30d structured</td><td><span class="badge badge-med">MEDIUM</span></td></tr>
+        <tr><td>Ingestion Breadth</td><td style="color:var(--red2)">Single provider call</td><td style="color:var(--green)">8-provider parallel ingestion</td><td><span class="badge badge-high">CRITICAL</span></td></tr>
+        <tr><td>XAI Depth</td><td style="color:var(--amber)">3 signal labels only</td><td style="color:var(--green)">SHAP attribution + NL explanation</td><td><span class="badge badge-high">HIGH</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════ PREDICTIONS ════════════════════════════════════════════════ -->
+<div id="tab-predictions" class="panel">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div>
+      <h2 style="font-size:16px;font-weight:700">Probabilistic Predictions</h2>
+      <p style="font-size:11px;color:var(--text3);margin-top:2px">Bayesian-weighted logistic regression · P10 / P50 / P90 bands</p>
+    </div>
+    <div id="pred-updated" style="font-size:10px;color:var(--text3)"></div>
+  </div>
+
+  <div class="grid3" id="pred-cards"></div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">72-Hour Escalation Index Forecast — Trajectory Fan (P10/P25/P50/P75/P90)</div>
+    <canvas id="fan-canvas"></canvas>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Multi-Horizon Forecast Summary</div>
+    <table>
+      <thead><tr><th>Horizon</th><th>Iran Strike P50</th><th>US Escalation P50</th><th>Shipping Disruption P50</th><th>Escalation Index</th><th>Trend</th></tr></thead>
+      <tbody id="horizon-table"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════ MONTE CARLO ════════════════════════════════════════════════ -->
+<div id="tab-montecarlo" class="panel">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div>
+      <h2 style="font-size:16px;font-weight:700">Monte Carlo Simulation Engine</h2>
+      <p style="font-size:11px;color:var(--text3);margin-top:2px">Multi-trajectory probabilistic scenario analysis with cluster detection</p>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Simulation Parameters</div>
+      <div class="slider-row">
+        <label>Iterations</label>
+        <select id="mc-iters" style="flex:1;background:var(--surface3);border:1px solid var(--border2);color:var(--text1);padding:6px 8px;border-radius:5px;font-size:11px">
+          <option value="1000">1,000 (legacy)</option>
+          <option value="5000">5,000</option>
+          <option value="10000" selected>10,000 (recommended)</option>
+          <option value="25000">25,000 (high precision)</option>
+        </select>
+      </div>
+      <div class="slider-row">
+        <label>Neg. Sentiment (0–1)</label>
+        <input type="range" id="mc-sent" min="0" max="100" value="45" oninput="document.getElementById('mc-sent-v').textContent=this.value+'%'">
+        <span class="slider-val" id="mc-sent-v">45%</span>
+      </div>
+      <div class="slider-row">
+        <label>Event Spike Ratio (×)</label>
+        <input type="range" id="mc-spike" min="10" max="600" value="180" oninput="document.getElementById('mc-spike-v').textContent=(this.value/100).toFixed(1)+'×'">
+        <span class="slider-val" id="mc-spike-v">1.8×</span>
+      </div>
+      <div class="slider-row">
+        <label>Commodity Shock (0–1)</label>
+        <input type="range" id="mc-comm" min="0" max="100" value="30" oninput="document.getElementById('mc-comm-v').textContent=this.value+'%'">
+        <span class="slider-val" id="mc-comm-v">30%</span>
+      </div>
+      <div class="slider-row">
+        <label>Scenario Pressure (0–1)</label>
+        <input type="range" id="mc-press" min="0" max="100" value="20" oninput="document.getElementById('mc-press-v').textContent=this.value+'%'">
+        <span class="slider-val" id="mc-press-v">20%</span>
+      </div>
+      <button class="btn btn-cyan" onclick="runMonteCarlo()" style="margin-top:8px;width:100%;justify-content:center">
+        ▶ Run Simulation
+      </button>
+      <div class="progress-wrap"><div class="progress-fill" id="mc-progress" style="width:0%"></div></div>
+      <div class="mc-status" id="mc-status">Ready to run simulation</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Outcome Distribution</div>
+      <div class="mc-result-grid" id="mc-outcomes">
+        <div class="mc-outcome"><div class="mc-outcome-name">Stability</div><div class="mc-outcome-pct" style="color:var(--green)" id="mc-stab">--</div></div>
+        <div class="mc-outcome"><div class="mc-outcome-name">Tension</div><div class="mc-outcome-pct" style="color:var(--amber)" id="mc-tens">--</div></div>
+        <div class="mc-outcome"><div class="mc-outcome-name">Crisis</div><div class="mc-outcome-pct" style="color:var(--red)" id="mc-cris">--</div></div>
+      </div>
+      <div class="chart-wrap" style="margin-top:12px;background:transparent;border:none;padding:0">
+        <div class="chart-title">Escalation Distribution Histogram</div>
+        <svg id="mc-hist" width="100%" height="140"></svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="chart-title">Trajectory Fan Chart — P10 / P25 / P50 / P75 / P90 across 30-day simulation</div>
+    <svg id="mc-fan" width="100%" height="200"></svg>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Scenario Cluster Analysis (K=3)</div>
+    <table>
+      <thead><tr><th>Cluster</th><th>Share of Runs</th><th>Peak Escalation</th><th>Peak Timing</th><th>Narrative</th></tr></thead>
+      <tbody id="mc-clusters"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════ WHAT-IF ════════════════════════════════════════════════════ -->
+<div id="tab-whatif" class="panel">
+  <div style="margin-bottom:16px">
+    <h2 style="font-size:16px;font-weight:700">What-If Scenario Engine</h2>
+    <p style="font-size:11px;color:var(--text3);margin-top:2px">Adjust parameters to re-run the full prediction engine. Deltas shown vs. baseline.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Scenario Input Parameters</div>
+      <div class="slider-row">
+        <label>Military Activity Level</label>
+        <input type="range" id="wi-mil" min="0" max="100" value="40" oninput="updateWhatIf()">
+        <span class="slider-val" id="wi-mil-v">40%</span>
+      </div>
+      <div class="slider-row">
+        <label>Economic Disruption</label>
+        <input type="range" id="wi-econ" min="0" max="100" value="25" oninput="updateWhatIf()">
+        <span class="slider-val" id="wi-econ-v">25%</span>
+      </div>
+      <div class="slider-row">
+        <label>Social Escalation Pressure</label>
+        <input type="range" id="wi-social" min="0" max="100" value="35" oninput="updateWhatIf()">
+        <span class="slider-val" id="wi-social-v">35%</span>
+      </div>
+      <div class="slider-row">
+        <label>Diplomatic Tension</label>
+        <input type="range" id="wi-dip" min="0" max="100" value="50" oninput="updateWhatIf()">
+        <span class="slider-val" id="wi-dip-v">50%</span>
+      </div>
+      <div class="slider-row">
+        <label>Proxy Mobilization</label>
+        <input type="range" id="wi-proxy" min="0" max="100" value="45" oninput="updateWhatIf()">
+        <span class="slider-val" id="wi-proxy-v">45%</span>
+      </div>
+      <div class="toggle-row">
+        <label>US Carrier Group Deployed</label>
+        <label class="toggle"><input type="checkbox" id="wi-carrier" onchange="updateWhatIf()"><span class="slider-bg"></span></label>
+      </div>
+      <div class="toggle-row">
+        <label>Chokepoint Closure Threat</label>
+        <label class="toggle"><input type="checkbox" id="wi-choke" onchange="updateWhatIf()"><span class="slider-bg"></span></label>
+      </div>
+      <div class="toggle-row">
+        <label>Oil Route Disruption Active</label>
+        <label class="toggle"><input type="checkbox" id="wi-oil" onchange="updateWhatIf()"><span class="slider-bg"></span></label>
+      </div>
+
+      <div style="margin-top:12px">
+        <button class="btn btn-ghost btn-sm" onclick="saveScenario('A')" style="margin-right:6px">Save as Scenario A</button>
+        <button class="btn btn-ghost btn-sm" onclick="saveScenario('B')">Save as Scenario B</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">Live Probability Output</div>
+        <div id="wi-probs"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Scenario Comparison</div>
+        <div class="grid3" id="sc-compare"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ EVENT CHAINS ═══════════════════════════════════════════════ -->
+<div id="tab-chains" class="panel">
+  <div style="margin-bottom:16px">
+    <h2 style="font-size:16px;font-weight:700">Event Chain Forecasting</h2>
+    <p style="font-size:11px;color:var(--text3);margin-top:2px">Causal DAG with conditional probabilities. Click a step to inspect.</p>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-bottom:14px">
+    <button class="btn btn-cyan btn-sm" onclick="showChain(0)">Chain 1: Strike → Market Shock</button>
+    <button class="btn btn-ghost btn-sm" onclick="showChain(1)">Chain 2: Proxy Retaliation</button>
+    <button class="btn btn-ghost btn-sm" onclick="showChain(2)">Chain 3: Diplomatic Collapse</button>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <svg id="dag-svg" width="100%" height="340" style="display:block;background:var(--surface2)"></svg>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title" id="chain-name">Chain 1: Strike → Market Shock</div>
+        <div id="chain-steps"></div>
+      </div>
+      <div class="card" id="chain-detail" style="display:none">
+        <div class="card-title">Step Detail</div>
+        <div id="chain-detail-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:0">
+    <div class="card-title">Path Probability Summary</div>
+    <table>
+      <thead><tr><th>#</th><th>Event</th><th>P(event)</th><th>P(chain)</th><th>ETA P50</th><th>Signal Layer</th></tr></thead>
+      <tbody id="chain-table"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════ XAI ════════════════════════════════════════════════════════ -->
+<div id="tab-xai" class="panel">
+  <div style="margin-bottom:16px">
+    <h2 style="font-size:16px;font-weight:700">Explainable AI Layer</h2>
+    <p style="font-size:11px;color:var(--text3);margin-top:2px">SHAP-style attribution · Signed contribution per feature · Natural-language reasoning</p>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-bottom:14px" id="xai-tabs">
+    <button class="btn btn-cyan btn-sm" onclick="showXAI('iran')">Iran Strike</button>
+    <button class="btn btn-ghost btn-sm" onclick="showXAI('us')">US Escalation</button>
+    <button class="btn btn-ghost btn-sm" onclick="showXAI('ship')">Shipping Disruption</button>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <div class="chart-wrap">
+        <div class="chart-title">Feature Attribution Waterfall (signed % point contribution)</div>
+        <div id="xai-waterfall"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Uncertainty Decomposition</div>
+        <div id="xai-uncertainty"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="background:rgba(14,116,144,.08);border-color:var(--cyan2)">
+        <div class="card-title" style="color:var(--cyan)">Natural-Language Explanation</div>
+        <div id="xai-explanation" style="font-size:12px;color:var(--text2);line-height:1.7"></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Supporting Evidence Events</div>
+        <div id="xai-evidence"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ ROADMAP ════════════════════════════════════════════════════ -->
+<div id="tab-roadmap" class="panel">
+  <div style="margin-bottom:16px">
+    <h2 style="font-size:16px;font-weight:700">Implementation Roadmap</h2>
+    <p style="font-size:11px;color:var(--text3);margin-top:2px">4-phase enhancement plan grounded in source code audit</p>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <div class="phase-card">
+        <div class="phase-title">Phase 1 — Critical Fixes</div>
+        <div class="phase-sub">Weeks 1–2 · Zero architectural risk</div>
+        <div class="phase-item">Increase MC iterations to 10,000 (config.js)</div>
+        <div class="phase-item">Add P50 percentile to simulateProbabilityBand</div>
+        <div class="phase-item">Refactor ingestion-service.js — parallel providers</div>
+        <div class="phase-item">Fix impact_score non-determinism (hash-seed baseImpact)</div>
+        <div class="phase-item">Add server-side /api/whatif endpoint</div>
+      </div>
+      <div class="phase-card" style="border-color:var(--amber)">
+        <div class="phase-title" style="color:var(--amber)">Phase 2 — Simulation Depth</div>
+        <div class="phase-sub">Weeks 3–5 · No external ML dependency</div>
+        <div class="phase-item">Multi-step trajectory MC (replace weighted-choice draw)</div>
+        <div class="phase-item">Fan chart data output (P10–P90 per time step)</div>
+        <div class="phase-item">K-means cluster analysis on MC trajectories</div>
+        <div class="phase-item">Replace Markov chain with configurable causal DAG</div>
+        <div class="phase-item">Multi-path computation: top-5 paths by probability</div>
+      </div>
+    </div>
+    <div>
+      <div class="phase-card" style="border-color:var(--blue)">
+        <div class="phase-title" style="color:var(--blue)">Phase 3 — Intelligence Quality</div>
+        <div class="phase-sub">Weeks 6–9 · NLP + XAI enhancements</div>
+        <div class="phase-item">Transformer NLP sidecar (FastAPI + ONNX DistilBERT)</div>
+        <div class="phase-item">CAMEO event code classification in normalize.js</div>
+        <div class="phase-item">SHAP-style attribution decomposition in prediction engine</div>
+        <div class="phase-item">Epistemic / aleatoric uncertainty decomposition</div>
+        <div class="phase-item">Natural-language explanation generation from attributions</div>
+      </div>
+      <div class="phase-card" style="border-color:var(--green)">
+        <div class="phase-title" style="color:var(--green)">Phase 4 — UI/UX Overhaul</div>
+        <div class="phase-sub">Weeks 10–14 · Front-end upgrades</div>
+        <div class="phase-item">PredictionPanel: P10/P50/P90 range bar + fan chart</div>
+        <div class="phase-item">Scenario tab with side-by-side comparison</div>
+        <div class="phase-item">ADS-B + naval track Leaflet map overlays</div>
+        <div class="phase-item">Global risk gauge in header bar</div>
+        <div class="phase-item">D3 DAG visualization for event chains</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Risk Register</div>
+    <table>
+      <thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr><td>NLP sidecar latency > 12s</td><td><span class="badge badge-med">MEDIUM</span></td><td><span class="badge badge-high">HIGH</span></td><td>Cache enrichment; decouple from prediction cycle with async update</td></tr>
+        <tr><td>ADS-B API rate limits / cost</td><td><span class="badge badge-high">HIGH</span></td><td><span class="badge badge-med">MEDIUM</span></td><td>Event-based sampling; fallback to RSS proxy signals</td></tr>
+        <tr><td>MC 10k iterations CPU load</td><td><span class="badge badge-low">LOW</span></td><td><span class="badge badge-med">MEDIUM</span></td><td>Worker thread parallelism; profile before optimizing</td></tr>
+        <tr><td>DAG schema maintenance overhead</td><td><span class="badge badge-med">MEDIUM</span></td><td><span class="badge badge-med">MEDIUM</span></td><td>Version-control JSON; validate on startup; document each chain</td></tr>
+        <tr><td>Random Forest model drift</td><td><span class="badge badge-high">HIGH</span></td><td><span class="badge badge-med">MEDIUM</span></td><td>Scheduled quarterly retraining; monitor Brier score in production</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════ MAP VIEW ══════════════════════════════════════════════════ -->
+<div id="tab-mapview" class="panel">
+
+  <!-- Map Header -->
+  <div class="map-header">
+    <div>
+      <div class="map-header-title">Geo Political Intelligence System — Live Map</div>
+      <div class="map-header-sub">Real-time geopolitical monitoring · verified live feeds · map intelligence · risk signals</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="btn btn-cyan btn-sm" id="map-sc-base" onclick="setMapScenario('baseline')">Baseline</button>
+      <button class="btn btn-ghost btn-sm" id="map-sc-cris" onclick="setMapScenario('crisis')">Crisis</button>
+      <button class="btn btn-ghost btn-sm" id="map-sc-ext" onclick="setMapScenario('extreme')">Extreme</button>
+      <div style="display:flex;align-items:center;gap:5px">
+        <div class="dot" id="map-live-dot" style="background:var(--amber)"></div>
+        <span style="font-size:10px;color:var(--text2)" id="map-live-label">Loading…</span>
+      </div>
+      <div class="hbadge" id="map-feed-badge">LOADING</div>
+      <span style="font-size:9px;color:var(--text3)" id="map-time">--</span>
+      <button class="btn btn-ghost btn-sm" onclick="fetchLiveIntelligence()" title="Refresh now" style="padding:4px 8px">↻</button>
+    </div>
+  </div>
+
+  <!-- 3-Panel Body -->
+  <div class="map-body">
+
+    <!-- LEFT: Live Feed -->
+    <div class="map-feed">
+      <div class="map-feed-top">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan);display:flex;align-items:center;gap:6px">
+            <div class="dot" id="feed-live-dot" style="background:var(--amber)"></div> Live Feed
+          </div>
+          <div style="font-size:9px;color:var(--text3)" id="feed-last-update">Fetching…</div>
+        </div>
+        <input class="feed-search" id="feed-search" type="text" placeholder="Search region, headline, keyword..." oninput="applyFeedFilters()">
+        <div class="feed-filters">
+          <select class="feed-select" id="feed-region" onchange="applyFeedFilters()">
+            <option>All</option>
+            <option>Middle East</option>
+            <option>Europe</option>
+            <option>Americas</option>
+            <option>Eurasia</option>
+          </select>
+          <select class="feed-select" id="feed-cat" onchange="applyFeedFilters()">
+            <option>All</option>
+            <option>Military</option>
+            <option>Naval</option>
+            <option>Diplomacy</option>
+            <option>Economics</option>
+            <option>Politics</option>
+            <option>Proxy</option>
+          </select>
+        </div>
+        <div style="font-size:9px;color:var(--text3);margin-bottom:5px;letter-spacing:.08em">SEVERITY FILTER</div>
+        <div class="feed-sev-row">
+          <div class="sev-btn sev-high" id="sev-High" onclick="toggleSev('High')">High</div>
+          <div class="sev-btn sev-med"  id="sev-Medium" onclick="toggleSev('Medium')">Medium</div>
+          <div class="sev-btn sev-norm" id="sev-Normal" onclick="toggleSev('Normal')">Normal</div>
+        </div>
+        <div class="feed-meta">
+          <span id="feed-count">-- incidents</span>
+          <span>Newest first</span>
+        </div>
+      </div>
+      <div id="feed-list"></div>
+    </div>
+
+    <!-- CENTER: Leaflet Map -->
+    <div id="gip-map"></div>
+
+    <!-- RIGHT: Intel Panel -->
+    <div class="map-intel">
+
+      <!-- Prediction Evidence Graph -->
+      <div class="intel-section">
+        <div class="intel-section-title">Prediction Evidence Graph</div>
+        <div class="ev-tabs" id="ev-tabs"></div>
+        <div id="ev-list"></div>
+      </div>
+
+      <!-- Why + What Next (Escalation Path) -->
+      <div class="intel-section">
+        <div class="intel-section-title">Why + What Next</div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:6px" id="why-summary">
+          Social escalation pressure · High-velocity signals · Incident cluster detected
+        </div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--text3);margin-bottom:5px">LIKELY ESCALATION PATH</div>
+        <div id="esc-path"></div>
+        <div style="font-size:9px;color:var(--text3);margin-top:5px" id="esc-prob">Path probability --</div>
+      </div>
+
+      <!-- Recommended Actions -->
+      <div class="intel-section">
+        <div class="intel-section-title">Recommended Actions</div>
+        <div id="rec-actions"></div>
+      </div>
+
+      <!-- Selected Incident Detail -->
+      <div class="intel-section" id="inc-detail" style="display:none">
+      </div>
+
+      <!-- Confidence Explanation -->
+      <div class="intel-section">
+        <div class="intel-section-title">Confidence Explanation</div>
+        <div style="font-size:10px;color:var(--text2);line-height:1.6" id="conf-explain">
+          Cross-source agreement <span style="color:var(--cyan)" id="ce-agree">0.74</span> — Tier-1 and Tier-2 sources aligned on escalation direction. Satellite feed offline reduces verification confidence by ~8%. Model operating at <span style="color:var(--amber)" id="ce-conf">74%</span> overall confidence.
+        </div>
+      </div>
+
+    </div><!-- /map-intel -->
+  </div><!-- /map-body -->
+</div><!-- /tab-mapview -->
+
+<!-- ══════════ TRUTH TRACKER ══════════════════════════════════════════════ -->
+<div id="tab-truth" class="panel">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div>
+      <h2 style="font-size:16px;font-weight:700">Prediction Truth Tracker</h2>
+      <p style="font-size:11px;color:var(--text3);margin-top:2px">Forecast vs. outcome · Brier score · Calibration analysis · Model accountability</p>
+    </div>
+    <span class="badge badge-med">BETA — 30-day rolling window</span>
+  </div>
+
+  <div class="grid4" style="margin-bottom:14px">
+    <div class="truth-stat"><div class="truth-stat-val" style="color:var(--green)" id="tt-acc">--</div><div class="truth-stat-label">Accuracy (Binary)</div></div>
+    <div class="truth-stat"><div class="truth-stat-val" style="color:var(--cyan)" id="tt-brier">--</div><div class="truth-stat-label">Brier Score ↓ better</div></div>
+    <div class="truth-stat"><div class="truth-stat-val" style="color:var(--amber)" id="tt-cal">--</div><div class="truth-stat-label">Calibration Error</div></div>
+    <div class="truth-stat"><div class="truth-stat-val" style="color:var(--text1)" id="tt-n">--</div><div class="truth-stat-label">Resolved Predictions</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Resolved Prediction Log</div>
+      <table>
+        <thead><tr><th>Prediction</th><th>Forecast P50</th><th>Outcome</th><th>Error</th><th>Brier</th></tr></thead>
+        <tbody id="tt-log"></tbody>
+      </table>
+    </div>
+    <div>
+      <div class="chart-wrap" style="margin-bottom:12px">
+        <div class="chart-title">Calibration Curve — Forecast Probability vs. Observed Frequency</div>
+        <svg id="tt-calib" width="100%" height="220"></svg>
+      </div>
+      <div class="card">
+        <div class="card-title">Model Performance by Category</div>
+        <div id="tt-category"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:0;background:rgba(14,116,144,.06);border-color:var(--cyan2)">
+    <div class="card-title" style="color:var(--cyan)">Pending Resolutions — Active Predictions Awaiting Outcome</div>
+    <div id="tt-pending"></div>
+  </div>
+</div>
+
+<!-- ══════════ ASK INTEL ══════════════════════════════════════════════════ -->
+<div id="tab-ask" class="panel">
+  <div style="margin-bottom:16px">
+    <h2 style="font-size:16px;font-weight:700">Ask the Intelligence Platform</h2>
+    <p style="font-size:11px;color:var(--text3);margin-top:2px">Query the current intelligence state in natural language. Responses are grounded in live signal data.</p>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <div class="qa-history" id="qa-history">
+        <div class="qa-msg qa-intel">
+          <div class="qa-label">GIP v2.0</div>
+          <div class="qa-bubble">Intelligence platform online. I have access to <strong>8 signal layers</strong> — core news, OSINT, air radar, naval radar, social, and satellite feeds. Ask me about current risk levels, predictions, specific threats, signal confidence, or scenario analysis.</div>
+        </div>
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Suggested Questions</div>
+        <div id="qa-suggestions"></div>
+      </div>
+      <div class="qa-input-row">
+        <input class="qa-input" id="qa-input" type="text" placeholder="Ask about risk levels, predictions, signals, or scenarios..." onkeydown="if(event.key==='Enter') sendQA()">
+        <button class="qa-send" onclick="sendQA()">Ask ▶</button>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">Current Intelligence State (Context)</div>
+        <div id="qa-context"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Signal Layer Status</div>
+        <div id="qa-signals"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /body -->
+
+<!-- TICKER -->
+<div id="ticker">
+  <div class="tick-label">Live Feed</div>
+  <div class="tick-scroll"><div class="tick-inner" id="tick-inner"></div></div>
+</div>
+
+</div><!-- /app -->
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  CORE SIMULATION ENGINE  (mirrors prediction-engine.js logic in browser)
+// ═══════════════════════════════════════════════════════════════════════════
+const SCENARIO_MULT = { baseline:1, crisis:1.35, extreme:1.8 };
+let currentScenario = 'baseline';
+let savedScenarios = { baseline:null, A:null, B:null };
+
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function sigmoid(x){ return 1/(1+Math.exp(-x)); }
+function randN(){ let u=0,v=0; while(!u)u=Math.random(); while(!v)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+function percentile(sorted,q){ const i=Math.max(0,Math.min(sorted.length-1,Math.floor((sorted.length-1)*q))); return sorted[i]; }
+
+function computeFeatures(inp){
+  const sm = SCENARIO_MULT[currentScenario]||1;
+  return {
+    negSentiment:     clamp(inp.negSent/100, 0,1),
+    highImpactRatio:  clamp(inp.impact/100,  0,1),
+    escalationKwRatio:clamp(inp.escKw/100,   0,1),
+    airOps:           clamp(inp.airOps,       0,30),
+    navalOps:         clamp(inp.navalOps,     0,20),
+    proxyOps:         clamp(inp.proxyOps,     0,20),
+    socialOps:        clamp(inp.socialOps,    0,25),
+    eventSpikeRatio:  clamp(inp.spikeRatio,   0,6),
+    crisisProb:       clamp(inp.crisisProb/100,0,1),
+    tensionProb:      clamp(inp.tensionProb/100,0,1),
+    commodityShock:   clamp(inp.commShock/100, 0,1),
+    scenarioPressure: clamp((sm-1),            0,1)
+  };
+}
+
+function runPredEngine(features, runs=2400){
+  const f=features, sm=1+f.scenarioPressure*0.65;
+  const pIran = sigmoid(-1.78+2.6*f.negSentiment+2.0*f.highImpactRatio+1.35*f.escalationKwRatio+0.24*Math.log1p(f.airOps+f.proxyOps)+0.9*f.crisisProb+0.4*f.scenarioPressure);
+  const pUS   = sigmoid(-1.94+2.15*f.negSentiment+1.35*f.highImpactRatio+0.36*Math.log1p(f.airOps)+0.22*Math.log1p(f.navalOps)+0.78*f.tensionProb+0.31*f.scenarioPressure);
+  const pShip = sigmoid(-2.1+2.2*f.commodityShock+0.54*Math.log1p(f.navalOps)+0.33*Math.log1p(f.proxyOps)+0.58*f.crisisProb+0.25*f.scenarioPressure);
+
+  const bv = clamp(0.06+f.eventSpikeRatio*0.028,0.06,0.18)*sm;
+
+  function band(base, vMult=1){
+    const b=clamp(base*sm,0.01,0.99), v=bv*vMult;
+    const samp=[];
+    for(let i=0;i<runs;i++) samp.push(clamp(b+randN()*v,0.01,0.99));
+    samp.sort((a,b)=>a-b);
+    return {
+      p10: +(percentile(samp,.10)*100).toFixed(1),
+      p50: +(percentile(samp,.50)*100).toFixed(1),
+      p90: +(percentile(samp,.90)*100).toFixed(1),
+    };
+  }
+
+  return {
+    iran:  band(pIran, 1.0),
+    us:    band(pUS,   0.84),
+    ship:  band(pShip, 0.90),
+  };
+}
+
+// Default inputs state
+let currentInputs = {
+  negSent:45, impact:38, escKw:32, airOps:8, navalOps:5, proxyOps:6, socialOps:7,
+  spikeRatio:1.8, crisisProb:22, tensionProb:34, commShock:30, scenarioPressure:20
+};
+
+function getBaselinePreds(){
+  return runPredEngine(computeFeatures(currentInputs));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  OVERVIEW METRICS
+// ═══════════════════════════════════════════════════════════════════════════
+function computeRisk(inp){
+  const sm=SCENARIO_MULT[currentScenario]||1;
+  const f=computeFeatures(inp);
+  const geoTension = clamp(28+f.negSentiment*42+(f.crisisProb*36+f.tensionProb*18)/100*sm, 5,100);
+  const mktStress  = clamp(22+f.commodityShock*75+f.negSentiment*18+f.crisisProb*0.22*sm, 4,100);
+  const anomaly    = clamp(10+f.eventSpikeRatio*22+Math.abs(f.negSentiment)*45, 0,100);
+  const risk       = clamp(geoTension*0.47+mktStress*0.4+anomaly*0.13, 0,100);
+  return { geoTension, mktStress, anomaly, risk,
+    level: risk>=82?'Critical':risk>=66?'High':risk>=42?'Elevated':'Contained' };
+}
+
+function updateOverview(){
+  const r=computeRisk(currentInputs);
+  const preds=getBaselinePreds();
+
+  set('m-geo', r.geoTension.toFixed(1));
+  set('m-mkt', r.mktStress.toFixed(1));
+  set('m-anom', r.anomaly.toFixed(1));
+  set('m-risk', r.risk.toFixed(1));
+  set('m-risk-level', r.level);
+  style('m-geo-bar','width',r.geoTension+'%');
+  style('m-mkt-bar','width',r.mktStress+'%');
+  style('m-anom-bar','width',r.anomaly+'%');
+  style('m-risk-bar','width',r.risk+'%');
+
+  const rColor = r.risk>=66?'var(--red)':r.risk>=42?'var(--amber)':'var(--green)';
+  style('m-risk-bar','background',rColor);
+
+  set('h-risk', r.risk.toFixed(0));
+  set('h-conf', '74%');
+  set('h-scenario', currentScenario);
+  set('last-update', new Date().toLocaleTimeString());
+
+  drawDial(r.risk);
+  updateSignalHealth();
+  updateDrivers(computeFeatures(currentInputs));
+}
+
+function drawDial(val){
+  const svg=document.getElementById('risk-dial');
+  const v=clamp(val,0,100);
+  const angle=(v/100)*180-180; // -180 to 0
+  const r=22, cx=26, cy=28;
+  const toXY=(deg)=>({ x:cx+r*Math.cos(deg*Math.PI/180), y:cy+r*Math.sin(deg*Math.PI/180) });
+  const arcPath=(from,to,clr)=>{
+    const s=toXY(from+180), e=toXY(to+180);
+    return `<path d="M${s.x},${s.y} A${r},${r} 0 0,1 ${e.x},${e.y}" stroke="${clr}" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+  };
+  const needle=toXY(angle+180);
+  const color = v>=66?'#ef4444':v>=42?'#f59e0b':'#10b981';
+  svg.innerHTML = arcPath(-180,-120,'#1e3050')+arcPath(-120,-60,'#374151')+arcPath(-60,0,'#374151')+
+    arcPath(-180,angle,color)+
+    `<line x1="${cx}" y1="${cy}" x2="${needle.x}" y2="${needle.y}" stroke="${color}" stroke-width="2" stroke-linecap="round"/>
+     <circle cx="${cx}" cy="${cy}" r="2.5" fill="${color}"/>`;
+}
+
+const SIGNAL_LAYERS=[
+  {name:'core_news',   status:'green', events:14, age:'4s', recent:[
+    {event:'Pentagon confirms tanker aircraft sorties increased 40%',source:'AP/Reuters',conf:0.91,utc:'11:42 UTC',impact:'+5.8 risk pts'},
+    {event:'US DoD spokesperson: "all options remain on the table"',source:'core_news',conf:0.88,utc:'11:39 UTC',impact:'+3.2 risk pts'},
+    {event:'UK Foreign Office issues Gulf travel advisory Level 3',source:'FCO feed',conf:0.85,utc:'11:31 UTC',impact:'+2.1 risk pts'},
+  ]},
+  {name:'news_api',    status:'green', events:22, age:'8s', recent:[
+    {event:'IAEA: undeclared nuclear material detected at Isfahan site',source:'Reuters',conf:0.82,utc:'11:40 UTC',impact:'+7.1 risk pts'},
+    {event:'Brent crude +4.2% intraday on Gulf tension escalation',source:'Bloomberg',conf:0.94,utc:'11:35 UTC',impact:'+6.3 risk pts'},
+    {event:'Lloyd\'s increases Gulf war-risk premiums by 18%',source:'Lloyd\'s of London',conf:0.90,utc:'11:28 UTC',impact:'+4.4 risk pts'},
+  ]},
+  {name:'osint_war',   status:'green', events:9,  age:'12s', recent:[
+    {event:'IRGC vessels spotted in Hormuz transit lane — 3 fast-attack craft',source:'AIS + Satellite',conf:0.82,utc:'11:38 UTC',impact:'+6.2 risk pts'},
+    {event:'Bellingcat: naval activity near Bandar Abbas port confirmed',source:'Satellite imagery',conf:0.79,utc:'11:25 UTC',impact:'+4.8 risk pts'},
+  ]},
+  {name:'radar_air',   status:'amber', events:3,  age:'34s', recent:[
+    {event:'KC-135 tanker sorties +34% above 72h rolling baseline',source:'ADS-B Exchange',conf:0.77,utc:'11:08 UTC',impact:'+8.4 risk pts'},
+    {event:'E-3 Sentry AWACS active orbit over Gulf region — continuous',source:'radar_air',conf:0.74,utc:'10:54 UTC',impact:'+5.1 risk pts'},
+  ]},
+  {name:'radar_naval', status:'amber', events:2,  age:'41s', recent:[
+    {event:'USS Gerald Ford CSG: Red Sea entry confirmed via AIS',source:'MarineTraffic',conf:0.89,utc:'10:51 UTC',impact:'+9.2 risk pts'},
+    {event:'Three VLCCs alter course away from Hormuz strait',source:'AIS tracking',conf:0.93,utc:'10:44 UTC',impact:'+7.7 risk pts'},
+  ]},
+  {name:'social_x',    status:'green', events:18, age:'6s', recent:[
+    {event:'Supreme Leader verified account: "response will be crushing"',source:'X/Twitter',conf:0.71,utc:'11:41 UTC',impact:'+4.2 risk pts'},
+    {event:'GeoConfirmed: satellite confirmation of Bandar Abbas naval movement',source:'X/Twitter',conf:0.83,utc:'11:33 UTC',impact:'+3.9 risk pts'},
+    {event:'Israeli MFA posts alert re Gulf escalation preparedness',source:'X/Twitter',conf:0.76,utc:'11:20 UTC',impact:'+2.6 risk pts'},
+  ]},
+  {name:'social_reddit',status:'green', events:11, age:'9s', recent:[
+    {event:'r/geopolitics: Gulf escalation thread — 2.3k upvotes, high-credibility sources',source:'Reddit',conf:0.55,utc:'11:36 UTC',impact:'+1.1 risk pts'},
+  ]},
+  {name:'satellite',   status:'red',   events:0,  age:'3m',  recent:[]},
+];
+let sigExpanded={};
+
+function updateSignalHealth(){
+  document.getElementById('signal-health').innerHTML=SIGNAL_LAYERS.map((l,idx)=>`
+    <div>
+      <div class="sig-row" onclick="toggleSig(${idx})">
+        <div class="sig-dot sig-${l.status}"></div>
+        <span style="font-size:11px;color:var(--text1);flex:1">${l.name}</span>
+        <span style="font-size:9px;color:var(--text3)">${l.events} events · ${l.age} ago</span>
+        <span class="sig-expand-icon" id="sig-icon-${idx}" style="margin-left:8px">${l.recent.length?'▸':''}</span>
+      </div>
+      <div class="sig-events ${sigExpanded[idx]?'open':''}" id="sig-ev-${idx}">
+        ${l.recent.length?l.recent.map(e=>`
+          <div class="sig-event-row">
+            <div>
+              <div class="sig-event-title">${e.event}</div>
+              <div class="sig-event-meta">
+                <span>📡 ${e.source}</span>
+                <span class="conf">Conf: ${(e.conf*100).toFixed(0)}%</span>
+                <span class="utc">⏱ ${e.utc}</span>
+                <span class="impact">⚠ ${e.impact}</span>
+              </div>
+            </div>
+          </div>`).join(''):'<div style="padding:8px 10px;font-size:10px;color:var(--text3)">No events in window</div>'}
+      </div>
+    </div>`).join('');
+}
+
+function toggleSig(idx){
+  sigExpanded[idx]=!sigExpanded[idx];
+  const ev=document.getElementById('sig-ev-'+idx);
+  const icon=document.getElementById('sig-icon-'+idx);
+  if(ev){ ev.className='sig-events '+(sigExpanded[idx]?'open':''); }
+  if(icon){ icon.textContent=SIGNAL_LAYERS[idx].recent.length?(sigExpanded[idx]?'▾':'▸'):''; }
+}
+
+function updateDrivers(f){
+  const rTotal=computeRisk(currentInputs).risk;
+  const airContrib  = clamp(f.airOps/14*100*0.47*0.28,0,25);
+  const sentContrib = clamp(f.negSentiment*100*0.47*0.19,0,20);
+  const commContrib = clamp(f.commodityShock*100*0.40*0.22,0,18);
+  const escContrib  = clamp(f.escalationKwRatio*100*0.47*0.15,0,15);
+  const socContrib  = clamp((f.socialOps/25)*100*0.13*0.60,0,10);
+
+  const drivers=[
+    {label:'Air/radar activity',  ppContrib:airContrib,  bar:clamp(f.airOps/14,0,1), positive:true,  desc:`increased composite risk by +${airContrib.toFixed(1)}pp`},
+    {label:'Negative sentiment',  ppContrib:sentContrib, bar:f.negSentiment,          positive:true,  desc:`added +${sentContrib.toFixed(1)}pp to geopolitical tension`},
+    {label:'Commodity shock',     ppContrib:commContrib, bar:f.commodityShock,        positive:true,  desc:`drove +${commContrib.toFixed(1)}pp via market stress pathway`},
+    {label:'Escalation language', ppContrib:escContrib,  bar:clamp(f.escalationKwRatio*1.4,0,1), positive:true, desc:`contributed +${escContrib.toFixed(1)}pp through keyword signal`},
+    {label:'Social escalation',   ppContrib:socContrib,  bar:clamp(Math.log1p(f.socialOps)/Math.log(10),0,1), positive:true, desc:`added +${socContrib.toFixed(1)}pp via anomaly layer`},
+  ].sort((a,b)=>b.ppContrib-a.ppContrib);
+
+  document.getElementById('top-drivers').innerHTML=drivers.map(d=>`
+    <div class="driver-row">
+      <div class="driver-header">
+        <span class="driver-label">${d.label}</span>
+        <span class="driver-cause ${d.positive?'':'neg'}">${d.positive?'+':''}${d.ppContrib.toFixed(1)}pp risk</span>
+      </div>
+      <div style="font-size:9px;color:var(--text3);margin-bottom:4px">${d.desc}</div>
+      <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+        <div style="height:100%;width:${Math.round(d.bar*100)}%;background:${d.positive?'var(--red)':'var(--green)'};border-radius:2px;opacity:.7"></div>
+      </div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  PREDICTIONS TAB
+// ═══════════════════════════════════════════════════════════════════════════
+const PRED_DEFS=[
+  {id:'iran', label:'Iran-linked Strike',      horizon:'7 days',  icon:'⚡'},
+  {id:'us',   label:'US Military Escalation',  horizon:'7 days',  icon:'🛡'},
+  {id:'ship', label:'Shipping Lane Disruption',horizon:'7 days',  icon:'⚓'},
+];
+
+function updatePredictions(){
+  const p=getBaselinePreds();
+  document.getElementById('pred-updated').textContent='Updated '+new Date().toLocaleTimeString()+' UTC · '+currentScenario;
+  document.getElementById('pred-cards').innerHTML=PRED_DEFS.map(d=>{
+    const b=p[d.id], pct=b.p50, band=b.p90-b.p10;
+    const color=pct>=55?'var(--red)':pct>=30?'var(--amber)':'var(--green)';
+    const badgeCls=pct>=55?'badge-high':pct>=30?'badge-med':'badge-low';
+    const badgeTxt=pct>=55?'HIGH':pct>=30?'ELEVATED':'CONTAINED';
+    const p10pct=b.p10, p90pct=b.p90;
+    const fillL=p10pct+'%', fillW=(p90pct-p10pct)+'%', p50pos=pct+'%';
+    return `<div class="prob-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:16px">${d.icon}</span>
+        <span class="badge ${badgeCls}">${badgeTxt}</span>
+      </div>
+      <div class="prob-label">${d.label}</div>
+      <div class="prob-horizon">Within ${d.horizon}</div>
+      <div class="prob-p50" style="color:${color}">${pct.toFixed(1)}%</div>
+      <div class="band-wrap">
+        <div class="band-fill" style="left:${fillL};width:${fillW};background:${color};opacity:.35"></div>
+        <div class="band-p50" style="left:${p50pos}"></div>
+      </div>
+      <div class="band-labels"><span>P10: ${b.p10.toFixed(1)}%</span><span>P50: ${pct.toFixed(1)}%</span><span>P90: ${b.p90.toFixed(1)}%</span></div>
+      <div style="margin-top:8px;font-size:10px;color:var(--text3)">Band width: ${band.toFixed(1)}pp · Method: Bayesian-MC</div>
+    </div>`;
+  }).join('');
+
+  drawFanChart();
+  updateHorizonTable(p);
+}
+
+function updateHorizonTable(p){
+  const horizons=[
+    {label:'6 hours',  mult:.15},
+    {label:'24 hours', mult:.5},
+    {label:'7 days',   mult:1.0},
+    {label:'30 days',  mult:1.35},
+  ];
+  document.getElementById('horizon-table').innerHTML=horizons.map(h=>{
+    const esc=clamp(24+h.mult*(computeFeatures(currentInputs).negSentiment*44+computeFeatures(currentInputs).eventSpikeRatio*8), 0,100);
+    const trend=h.mult>0.5?'↑ Escalating':'→ Stable';
+    return `<tr>
+      <td style="color:var(--cyan)">${h.label}</td>
+      <td>${(p.iran.p50*h.mult).toFixed(1)}%</td>
+      <td>${(p.us.p50*h.mult).toFixed(1)}%</td>
+      <td>${(p.ship.p50*h.mult).toFixed(1)}%</td>
+      <td>${esc.toFixed(1)}</td>
+      <td style="color:${h.mult>0.5?'var(--red)':'var(--text3)'}">${trend}</td>
+    </tr>`;
+  }).join('');
+}
+
+function drawFanChart(){
+  const canvas=document.getElementById('fan-canvas');
+  const W=canvas.clientWidth||700, H=220;
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const pad={l:40,r:20,t:20,b:30};
+  const cw=W-pad.l-pad.r, ch=H-pad.t-pad.b;
+
+  // Grid
+  ctx.strokeStyle='#1e3050'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=pad.t+ch*(1-i/4);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y); ctx.stroke();
+    ctx.fillStyle='#64748b'; ctx.font='9px system-ui';
+    ctx.fillText((i*25)+'',2,y+3);
+  }
+  for(let i=0;i<=6;i++){
+    const x=pad.l+cw*i/6;
+    ctx.beginPath(); ctx.moveTo(x,pad.t); ctx.lineTo(x,pad.t+ch); ctx.stroke();
+    ctx.fillStyle='#64748b'; ctx.font='9px system-ui';
+    ctx.textAlign='center'; ctx.fillText((i*12)+'h',x,H-5);
+  }
+
+  // Generate fan data
+  const f=computeFeatures(currentInputs);
+  const base=clamp(f.negSentiment*44+24+f.eventSpikeRatio*6,10,90);
+  const slope=(f.eventSpikeRatio>1.5?0.3:-0.1)*f.negSentiment;
+  const STEPS=72;
+  const bands=[.10,.25,.50,.75,.90];
+  const colors=['rgba(239,68,68,.12)','rgba(239,68,68,.18)','rgba(34,211,238,1)','rgba(239,68,68,.18)','rgba(239,68,68,.12)'];
+
+  const series=bands.map(q=>{
+    return Array.from({length:STEPS},(_,i)=>{
+      const t=i/STEPS, drift=base+slope*i+randN()*(8+q*12);
+      return clamp(drift*(0.8+q*0.4),0,100);
+    });
+  });
+
+  // Draw filled bands
+  for(let b=0;b<2;b++){
+    const hi=series[4-b], lo=series[b];
+    ctx.beginPath();
+    hi.forEach((v,i)=>{ const x=pad.l+cw*i/(STEPS-1), y=pad.t+ch*(1-v/100); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+    lo.slice().reverse().forEach((v,i)=>{ const x=pad.l+cw*(STEPS-1-i)/(STEPS-1), y=pad.t+ch*(1-v/100); ctx.lineTo(x,y); });
+    ctx.closePath(); ctx.fillStyle=colors[b]; ctx.fill();
+  }
+
+  // Draw P50 line
+  ctx.beginPath(); ctx.strokeStyle='#22d3ee'; ctx.lineWidth=2;
+  series[2].forEach((v,i)=>{ const x=pad.l+cw*i/(STEPS-1), y=pad.t+ch*(1-v/100); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+  ctx.stroke();
+
+  // Legend
+  ctx.fillStyle='#22d3ee'; ctx.font='bold 10px system-ui'; ctx.textAlign='left';
+  ctx.fillText('P50 (median)',pad.l+6,pad.t+14);
+  ctx.fillStyle='rgba(239,68,68,.5)';
+  ctx.fillRect(pad.l+90,pad.t+6,10,8);
+  ctx.fillStyle='#94a3b8'; ctx.font='10px system-ui';
+  ctx.fillText('P10–P90 band',pad.l+104,pad.t+14);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  MONTE CARLO TAB
+// ═══════════════════════════════════════════════════════════════════════════
+let mcResults=null;
+
+function runMonteCarlo(){
+  const iters=parseInt(document.getElementById('mc-iters').value);
+  const sent=document.getElementById('mc-sent').value/100;
+  const spike=document.getElementById('mc-spike').value/100;
+  const comm=document.getElementById('mc-comm').value/100;
+  const press=document.getElementById('mc-press').value/100;
+  const sm=SCENARIO_MULT[currentScenario]||1;
+
+  set('mc-status','Running '+iters.toLocaleString()+' iterations...');
+  style('mc-progress','width','0%');
+
+  // Run in chunks to show progress
+  const CHUNK=500;
+  let done=0;
+  const counters={Stability:0,Tension:0,Crisis:0};
+  const histBins=new Array(20).fill(0);
+  const trajSamples=[];
+
+  const baseRate=0.08+sent*0.22;
+  const sentW=1+sent*0.95;
+  const volF=1+spike/4+comm/2.8;
+  const crisisP=clamp(baseRate*sentW*volF*sm,0.03,0.92);
+  const tensionP=clamp(0.15+sent*0.23+spike/45,0.06,0.78);
+  const stabilityP=clamp(1-crisisP-tensionP,0.03,0.9);
+
+  function runChunk(){
+    for(let i=0;i<CHUNK&&done<iters;i++,done++){
+      const r=Math.random();
+      let outcome;
+      if(r<stabilityP){outcome='Stability';counters.Stability++;}
+      else if(r<stabilityP+tensionP){outcome='Tension';counters.Tension++;}
+      else{outcome='Crisis';counters.Crisis++;}
+
+      // Sample final escalation level for histogram
+      const baseEsc=outcome==='Crisis'?0.7:outcome==='Tension'?0.45:0.2;
+      const esc=clamp(baseEsc+randN()*0.12+press*0.15,0,1);
+      const bin=Math.min(19,Math.floor(esc*20));
+      histBins[bin]++;
+
+      // Trajectory (sample every 50th for fan chart)
+      if(done%50===0){
+        let traj=[]; let level=esc;
+        for(let t=0;t<30;t++){
+          level=clamp(level+randN()*0.04+press*0.01*(outcome==='Crisis'?1:-0.5),0,1);
+          traj.push(level);
+        }
+        trajSamples.push({traj, outcome});
+      }
+    }
+    const pct=Math.round(done/iters*100);
+    style('mc-progress','width',pct+'%');
+    set('mc-status',`Running... ${done.toLocaleString()} / ${iters.toLocaleString()} (${pct}%)`);
+
+    if(done<iters){ setTimeout(runChunk,0); }
+    else{ finalizeMC(counters,histBins,trajSamples,iters); }
+  }
+  setTimeout(runChunk,10);
+}
+
+function finalizeMC(counters,histBins,trajSamples,iters){
+  const s=(counters.Stability/iters*100).toFixed(1);
+  const t=(counters.Tension/iters*100).toFixed(1);
+  const c=(counters.Crisis/iters*100).toFixed(1);
+  set('mc-stab',s+'%'); set('mc-tens',t+'%'); set('mc-cris',c+'%');
+  set('mc-status',`Complete. ${iters.toLocaleString()} iterations · Crisis: ${c}% · Tension: ${t}% · Stability: ${s}%`);
+  style('mc-progress','width','100%');
+
+  drawMCHistogram(histBins,iters);
+  drawMCFan(trajSamples);
+  drawMCClusters(+c,+t,+s);
+}
+
+function drawMCHistogram(bins,iters){
+  const svg=document.getElementById('mc-hist');
+  const W=svg.clientWidth||400, H=140;
+  const max=Math.max(...bins);
+  const bw=(W-40)/20, pad={l:30,t:10,b:20};
+  let html=`<rect width="${W}" height="${H}" fill="none"/>`;
+  const colors=['#10b981','#10b981','#10b981','#10b981','#10b981','#10b981','#f59e0b','#f59e0b','#f59e0b','#f59e0b',
+                '#f59e0b','#f59e0b','#ef4444','#ef4444','#ef4444','#ef4444','#ef4444','#ef4444','#ef4444','#ef4444'];
+  bins.forEach((v,i)=>{
+    const bh=max>0?(v/max)*(H-pad.t-pad.b):0;
+    const x=pad.l+i*bw, y=H-pad.b-bh;
+    html+=`<rect x="${x+1}" y="${y}" width="${bw-2}" height="${bh}" fill="${colors[i]}" opacity=".7" rx="1"/>`;
+  });
+  // x-axis labels
+  html+=`<text x="${pad.l}" y="${H-4}" fill="#64748b" font-size="9" font-family="system-ui">0</text>`;
+  html+=`<text x="${pad.l+10*bw}" y="${H-4}" fill="#64748b" font-size="9" font-family="system-ui">0.5</text>`;
+  html+=`<text x="${pad.l+20*bw-10}" y="${H-4}" fill="#64748b" font-size="9" font-family="system-ui">1.0</text>`;
+  html+=`<text x="2" y="${H-20}" fill="#64748b" font-size="9" font-family="system-ui" transform="rotate(-90,8,${H-20})"># runs</text>`;
+  svg.innerHTML=html;
+}
+
+function drawMCFan(samples){
+  const svg=document.getElementById('mc-fan');
+  const W=svg.clientWidth||700, H=200;
+  const pad={l:36,r:16,t:16,b:28};
+  const cw=W-pad.l-pad.r, ch=H-pad.t-pad.b;
+  const STEPS=30;
+
+  if(!samples.length){svg.innerHTML='<text x="50%" y="50%" text-anchor="middle" fill="#64748b" font-family="system-ui" font-size="12">Run simulation to see fan chart</text>'; return;}
+
+  const byStep=Array.from({length:STEPS},(_,t)=>{
+    const vals=samples.map(s=>s.traj[t]).sort((a,b)=>a-b);
+    return {p10:percentile(vals,.10),p25:percentile(vals,.25),p50:percentile(vals,.50),p75:percentile(vals,.75),p90:percentile(vals,.90)};
+  });
+
+  let html=``;
+  // Grid
+  for(let i=0;i<=4;i++){
+    const y=pad.t+ch*(1-i/4);
+    html+=`<line x1="${pad.l}" y1="${y}" x2="${pad.l+cw}" y2="${y}" stroke="#1e3050" stroke-width="1"/>`;
+    html+=`<text x="2" y="${y+3}" fill="#64748b" font-size="9" font-family="system-ui">${(i*25)}%</text>`;
+  }
+  for(let i=0;i<=6;i++){
+    const x=pad.l+cw*i/6;
+    html+=`<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t+ch}" stroke="#1e3050" stroke-width="1"/>`;
+    html+=`<text x="${x}" y="${H-5}" fill="#64748b" font-size="9" font-family="system-ui" text-anchor="middle">d${Math.round(i*5)}</text>`;
+  }
+
+  const toXY=(i,v)=>({x:pad.l+cw*i/(STEPS-1), y:pad.t+ch*(1-v)});
+  const polyline=(key,opa,clr)=>{
+    const pts=byStep.map((s,i)=>{ const p=toXY(i,s[key]); return `${p.x},${p.y}`; }).join(' ');
+    return `<polyline points="${pts}" fill="none" stroke="${clr}" stroke-width="${key==='p50'?2:1}" stroke-opacity="${opa}"/>`;
+  };
+  const filled=(k1,k2,clr,opa)=>{
+    const hi=byStep.map((s,i)=>{ const p=toXY(i,s[k1]); return `${p.x},${p.y}`; }).join(' ');
+    const lo=byStep.slice().reverse().map((s,i)=>{ const p=toXY(STEPS-1-i,s[k2]); return `${p.x},${p.y}`; }).join(' ');
+    return `<polygon points="${hi} ${lo}" fill="${clr}" fill-opacity="${opa}"/>`;
+  };
+
+  html+=filled('p90','p10','#3b82f6',.08)+filled('p75','p25','#3b82f6',.12);
+  html+=polyline('p10',.4,'#64748b')+polyline('p90',.4,'#64748b');
+  html+=polyline('p25',.6,'#3b82f6')+polyline('p75',.6,'#3b82f6');
+  html+=polyline('p50',1,'#22d3ee');
+  // Legend
+  html+=`<rect x="${pad.l+6}" y="${pad.t+4}" width="10" height="6" fill="#22d3ee"/>
+         <text x="${pad.l+20}" y="${pad.t+11}" fill="#94a3b8" font-size="9" font-family="system-ui">P50 (median)</text>
+         <rect x="${pad.l+100}" y="${pad.t+4}" width="10" height="6" fill="#3b82f6" opacity=".3"/>
+         <text x="${pad.l+114}" y="${pad.t+11}" fill="#94a3b8" font-size="9" font-family="system-ui">P25–P75 band</text>`;
+
+  svg.innerHTML=html;
+}
+
+function drawMCClusters(crisis,tension,stability){
+  const clusterShare=[
+    {name:'Proxy Retaliation Cycle (A)',  share:(crisis*0.6).toFixed(1), peak:'0.78 (High)', day:'Day 4–6',  label:'Strike → Proxy counter-attack → Contained'},
+    {name:'Diplomatic Intervention (B)',  share:(tension*0.7).toFixed(1),peak:'0.44 (Moderate)',day:'Day 12–18',label:'Posturing → Backchannel → De-escalation'},
+    {name:'Acute Crisis Spike (C)',       share:(crisis*0.4).toFixed(1), peak:'0.93 (Critical)',day:'Day 2–3', label:'Direct exchange → Carrier response → Blockade'},
+  ];
+  document.getElementById('mc-clusters').innerHTML=clusterShare.map((c,i)=>{
+    const colors=['var(--amber)','var(--green)','var(--red)'];
+    return `<tr><td style="color:${colors[i]}">${c.name}</td><td>${c.share}%</td><td>${c.peak}</td><td>${c.day}</td><td style="color:var(--text2)">${c.label}</td></tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  WHAT-IF TAB
+// ═══════════════════════════════════════════════════════════════════════════
+function getWhatIfInputs(){
+  const mil=document.getElementById('wi-mil').value/100;
+  const econ=document.getElementById('wi-econ').value/100;
+  const social=document.getElementById('wi-social').value/100;
+  const dip=document.getElementById('wi-dip').value/100;
+  const proxy=document.getElementById('wi-proxy').value/100;
+  const carrier=document.getElementById('wi-carrier').checked;
+  const choke=document.getElementById('wi-choke').checked;
+  const oil=document.getElementById('wi-oil').checked;
+
+  const baseAirOps=8+mil*22+(carrier?8:0);
+  const baseNaval=5+mil*15+(carrier?6:0)+(choke?8:0);
+  const baseComm=clamp(30+(econ*60)+(oil?35:0)+(choke?25:0),0,100);
+
+  return {
+    negSent:  clamp(45+dip*50,0,100),
+    impact:   clamp(38+mil*40,0,100),
+    escKw:    clamp(32+dip*40+social*20,0,100),
+    airOps:   clamp(baseAirOps,0,30),
+    navalOps: clamp(baseNaval,0,20),
+    proxyOps: clamp(6+proxy*14,0,20),
+    socialOps:clamp(7+social*18,0,25),
+    spikeRatio:clamp(1.8+mil*2+dip*1.5,0,6),
+    crisisProb:clamp(22+mil*30+dip*20,0,90),
+    tensionProb:clamp(34+social*20+dip*15,0,80),
+    commShock: clamp(baseComm,0,100),
+    scenarioPressure:0
+  };
+}
+
+function updateWhatIf(){
+  // Update slider display values
+  ['mil','econ','social','dip','proxy'].forEach(k=>{
+    const v=document.getElementById('wi-'+k).value;
+    document.getElementById('wi-'+k+'-v').textContent=v+'%';
+  });
+
+  const inp=getWhatIfInputs();
+  const features=computeFeatures(inp);
+  const p=runPredEngine(features,800);
+  const base=getBaselinePreds();
+
+  const delta=(a,b)=>{
+    const d=a-b; const sign=d>=0?'+':'';
+    const cls=d>5?'delta-up':d<-5?'delta-down':'delta-neu';
+    return `<span class="delta ${cls}">${sign}${d.toFixed(1)}pp</span>`;
+  };
+
+  document.getElementById('wi-probs').innerHTML=PRED_DEFS.map(d=>{
+    const cur=p[d.id], bsl=base[d.id];
+    const color=cur.p50>=55?'var(--red)':cur.p50>=30?'var(--amber)':'var(--green)';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:11px;color:var(--text1)">${d.label}</span>
+      <div style="text-align:right">
+        <span style="font-size:16px;font-weight:800;color:${color}">${cur.p50.toFixed(1)}%</span>
+        ${delta(cur.p50,bsl.p50)}
+        <div style="font-size:9px;color:var(--text3)">P10 ${cur.p10.toFixed(0)}% · P90 ${cur.p90.toFixed(0)}%</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  renderScenarioCompare(p);
+}
+
+function saveScenario(name){
+  const inp=getWhatIfInputs();
+  const features=computeFeatures(inp);
+  savedScenarios[name]=runPredEngine(features,800);
+  if(!savedScenarios.baseline) savedScenarios.baseline=getBaselinePreds();
+  renderScenarioCompare(null);
+}
+
+function renderScenarioCompare(current){
+  if(!savedScenarios.baseline) savedScenarios.baseline=getBaselinePreds();
+  const slots=[
+    {key:'baseline', name:'Baseline'},
+    {key:'A', name:'Scenario A'},
+    {key:'B', name:'Scenario B'},
+  ];
+  const base=savedScenarios.baseline;
+  document.getElementById('sc-compare').innerHTML=slots.map(s=>{
+    const p=savedScenarios[s.key];
+    if(!p) return `<div class="sc-col"><div class="sc-name">${s.name}</div><div style="font-size:10px;color:var(--text3);padding:8px 0">Not saved yet.<br>Adjust sliders and click Save.</div></div>`;
+    const delta=(a,b)=>{const d=a-b; const sign=d>=0?'+':''; const cls=d>5?'delta-up':d<-5?'delta-down':'delta-neu'; return `<span class="delta ${cls}">${sign}${d.toFixed(1)}</span>`;};
+    return `<div class="sc-col">
+      <div class="sc-name">${s.name}</div>
+      ${PRED_DEFS.map(d=>`<div class="sc-row">
+        <div class="sc-label">${d.label.split(' ').slice(0,2).join(' ')}</div>
+        <div><span class="sc-val">${p[d.id].p50.toFixed(1)}%</span>${s.key!=='baseline'?delta(p[d.id].p50,base[d.id].p50):''}</div>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  EVENT CHAINS TAB
+// ═══════════════════════════════════════════════════════════════════════════
+const CHAINS=[
+  {name:'Chain 1: Strike → Market Shock',
+   steps:[
+    {event:'Missile/drone strike',      p:100,  chain:100, eta:'t=0',    layer:'radar_air + osint_war'},
+    {event:'Official condemnation',     p:94,   chain:94,  eta:'t+2h',   layer:'core_news'},
+    {event:'Retaliatory posturing',     p:72,   chain:68,  eta:'t+8h',   layer:'social_x + osint_war'},
+    {event:'Naval/air asset deployment',p:58,   chain:39,  eta:'t+18h',  layer:'radar_air + radar_naval'},
+    {event:'Chokepoint closure threat', p:41,   chain:16,  eta:'t+30h',  layer:'radar_naval + osint_war'},
+    {event:'Oil price shock >5%',       p:78,   chain:13,  eta:'t+36h',  layer:'macro / commodity'},
+    {event:'Market index disruption',   p:62,   chain:8,   eta:'t+42h',  layer:'macro / market'},
+  ]},
+  {name:'Chain 2: Proxy Retaliation',
+   steps:[
+    {event:'Proxy group attack',          p:100, chain:100, eta:'t=0',    layer:'osint_war'},
+    {event:'State sponsor attribution',   p:68,  chain:68,  eta:'t+4h',   layer:'social_x + core_news'},
+    {event:'Counter-strike authorization',p:54,  chain:37,  eta:'t+12h',  layer:'osint_war + radar_air'},
+    {event:'Expanded proxy mobilization', p:71,  chain:26,  eta:'t+24h',  layer:'osint_video + social_x'},
+    {event:'Regional actor intervention', p:38,  chain:10,  eta:'t+48h',  layer:'core_news + diplomatic'},
+  ]},
+  {name:'Chain 3: Diplomatic Collapse',
+   steps:[
+    {event:'High-level talks breakdown', p:100, chain:100, eta:'t=0',    layer:'core_news'},
+    {event:'Recall of ambassadors',      p:74,  chain:74,  eta:'t+6h',   layer:'core_news + osint_war'},
+    {event:'Economic sanctions imposed', p:61,  chain:45,  eta:'t+24h',  layer:'news_api + macro'},
+    {event:'Military posture escalation',p:48,  chain:22,  eta:'t+48h',  layer:'radar_air + radar_naval'},
+    {event:'Proxy activation signal',    p:39,  chain:9,   eta:'t+72h',  layer:'osint_war + social_x'},
+  ]},
+];
+
+let activeChain=0, activeStep=-1;
+
+function showChain(idx){
+  activeChain=idx; activeStep=-1;
+  document.getElementById('chain-name').textContent=CHAINS[idx].name;
+  document.getElementById('chain-detail').style.display='none';
+
+  document.getElementById('chain-steps').innerHTML=CHAINS[idx].steps.map((s,i)=>`
+    <div class="chain-step ${i===activeStep?'active':''}" onclick="selectChainStep(${i})">
+      <div class="cs-num">${i+1}</div>
+      <div>
+        <div class="cs-title">${s.event}</div>
+        <div class="cs-meta">${s.eta} · ${s.layer}</div>
+      </div>
+      <div class="cs-prob">${s.p}%</div>
+    </div>`).join('');
+
+  document.getElementById('chain-table').innerHTML=CHAINS[idx].steps.map((s,i)=>`
+    <tr>
+      <td style="color:var(--cyan)">${i+1}</td>
+      <td>${s.event}</td>
+      <td>${s.p===100?'Trigger':''+s.p+'%'}</td>
+      <td style="color:${s.chain<20?'var(--red)':s.chain<50?'var(--amber)':'var(--green)'}">${s.chain}%</td>
+      <td style="color:var(--text2)">${s.eta}</td>
+      <td style="color:var(--text3);font-size:10px">${s.layer}</td>
+    </tr>`).join('');
+
+  drawDAG(idx);
+}
+
+function selectChainStep(i){
+  activeStep=i;
+  const s=CHAINS[activeChain].steps[i];
+  document.getElementById('chain-detail').style.display='block';
+  document.getElementById('chain-detail-content').innerHTML=`
+    <div style="margin-bottom:8px"><span class="badge badge-med">STEP ${i+1}</span></div>
+    <div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:4px">${s.event}</div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:10px">Signal layer: ${s.layer}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="mcard" style="padding:10px"><div class="mcard-label">P(event)</div><div class="mcard-val" style="font-size:18px;color:var(--cyan)">${s.p}%</div></div>
+      <div class="mcard" style="padding:10px"><div class="mcard-label">P(full chain)</div><div class="mcard-val" style="font-size:18px;color:${s.chain<20?'var(--red)':'var(--amber)'}">${s.chain}%</div></div>
+    </div>
+    <div style="margin-top:10px;font-size:10px;color:var(--text2)">ETA (P50): <strong style="color:var(--text1)">${s.eta}</strong></div>`;
+  showChain(activeChain);
+}
+
+function drawDAG(chainIdx){
+  const steps=CHAINS[chainIdx].steps;
+  const svg=document.getElementById('dag-svg');
+  const W=svg.clientWidth||400, H=340;
+  const nodeH=36, nodeW=Math.min(W-40,180);
+  const startX=(W-nodeW)/2, gapY=(H-40)/(steps.length);
+
+  let html='';
+  steps.forEach((s,i)=>{
+    const x=startX, y=20+i*gapY;
+    const isActive=i===activeStep;
+    const pColor=s.chain>=50?'#10b981':s.chain>=20?'#f59e0b':'#ef4444';
+    if(i>0){
+      const py=20+(i-1)*gapY+nodeH;
+      html+=`<line x1="${x+nodeW/2}" y1="${py}" x2="${x+nodeW/2}" y2="${y}" stroke="#1e3050" stroke-width="1.5" marker-end="url(#arrow)"/>
+             <text x="${x+nodeW+8}" y="${py+gapY/2-nodeH/2+10}" fill="${pColor}" font-size="9" font-family="system-ui">${s.chain}%</text>`;
+    }
+    html+=`<rect class="cn-bg" x="${x}" y="${y}" width="${nodeW}" height="${nodeH}" rx="5"
+              fill="${isActive?'rgba(34,211,238,.15)':'#131f35'}" stroke="${isActive?'#22d3ee':'#1e3050'}" stroke-width="${isActive?2:1}"
+              onclick="selectChainStep(${i})" style="cursor:pointer"/>
+           <text x="${x+10}" y="${y+14}" fill="#f1f5f9" font-size="10" font-family="system-ui" font-weight="600">${i+1}. ${s.event.length>20?s.event.slice(0,20)+'…':s.event}</text>
+           <text x="${x+10}" y="${y+26}" fill="#64748b" font-size="9" font-family="system-ui">${s.eta} · ${s.p===100?'trigger':s.p+'%'}</text>`;
+  });
+
+  svg.innerHTML=`<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+    <path d="M1,1 L7,4 L1,7 Z" fill="#1e3050"/></marker></defs>${html}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  XAI TAB
+// ═══════════════════════════════════════════════════════════════════════════
+const XAI_DATA={
+  iran:{
+    pred:'Iran-linked Strike (7d)', p50:47, conf:68,
+    attrs:[
+      {label:'Air/ISR activity spike +34%',   val:9.2,  dir:1},
+      {label:'Escalatory rhetoric 38% share', val:7.8,  dir:1},
+      {label:'Naval patrol in Hormuz',         val:4.1,  dir:1},
+      {label:'Crude oil futures +4.2%',        val:3.6,  dir:1},
+      {label:'No ceasefire signal (absence)',  val:2.9,  dir:1},
+      {label:'Cross-source agreement 0.74',   val:1.8,  dir:1},
+      {label:'Diplomatic back-channel signal', val:-3.2, dir:-1},
+      {label:'Historical base rate prior',     val:-2.1, dir:-1},
+    ],
+    explanation:`Probability elevated to <strong>47%</strong> (P50) from baseline prior of ~22% driven by: (1) air surveillance activity spike <strong>+34%</strong> above 72h baseline [+9.2pp], (2) escalatory rhetoric reaching <strong>38%</strong> of verified headlines in the last 6h [+7.8pp], (3) naval patrol assets logged in Hormuz transit corridor [+4.1pp], (4) crude oil futures <strong>+4.2% intraday</strong> [+3.6pp]. Confidence interval P10–P90: <strong>31%–68%</strong>. Model variance: moderate (Δband=37pp). Cross-source agreement is high (0.74) — Tier-1 and Tier-2 sources are aligned on escalation direction.`,
+    evidence:[
+      {headline:'Iranian IRGC vessels enter Hormuz transit lane', source:'osint_war', score:92},
+      {headline:'Pentagon confirms tanker aircraft sorties increased 40%', source:'radar_air', score:88},
+      {headline:'Supreme Leader rhetoric: "response will be crushing"', source:'social_x', score:81},
+      {headline:'Oil futures surge amid Gulf tensions', source:'news_api', score:76},
+    ]
+  },
+  us:{
+    pred:'US Military Escalation (7d)', p50:33, conf:61,
+    attrs:[
+      {label:'Carrier group AIS movement',   val:7.1, dir:1},
+      {label:'Pentagon press briefing tone',  val:5.3, dir:1},
+      {label:'US election cycle pressure',    val:2.8, dir:1},
+      {label:'Ally coordination signals',     val:2.1, dir:1},
+      {label:'Diplomatic channel still open', val:-4.2,dir:-1},
+      {label:'Congressional opposition',      val:-2.8,dir:-1},
+      {label:'Historical de-escalation rate', val:-1.9,dir:-1},
+    ],
+    explanation:`US escalation probability at <strong>33%</strong> (P50). Primary driver is carrier group repositioning detected via AIS data [+7.1pp] paired with elevated Pentagon briefing language [+5.3pp]. Partially offset by active back-channel diplomacy [-4.2pp] and Congressional resistance signals [-2.8pp]. Confidence interval: <strong>19%–55%</strong>. Note: epistemic uncertainty elevated — diplomatic back-channel status is opaque.`,
+    evidence:[
+      {headline:'USS Gerald Ford carrier strike group enters Red Sea', source:'radar_naval', score:90},
+      {headline:'Pentagon spokesperson: "all options on the table"', source:'core_news', score:84},
+      {headline:'US-allied defense ministers hold emergency call', source:'news_api', score:72},
+    ]
+  },
+  ship:{
+    pred:'Shipping Disruption (7d)', p50:52, conf:71,
+    attrs:[
+      {label:'Hormuz naval pressure',         val:11.2,dir:1},
+      {label:'Commodity shock intensity',      val:8.4, dir:1},
+      {label:'Tanker re-routing signals',      val:5.9, dir:1},
+      {label:'Insurance rate spike',           val:4.2, dir:1},
+      {label:'Crisis probability 22%',         val:3.1, dir:1},
+      {label:'Alternative route capacity',     val:-3.8,dir:-1},
+      {label:'Coast Guard escort deployed',    val:-2.1,dir:-1},
+    ],
+    explanation:`Shipping disruption is the <strong>highest-probability prediction</strong> at <strong>52%</strong> (P50). Naval pressure in Hormuz is the dominant driver [+11.2pp] combined with commodity shock signals [+8.4pp]. Tanker re-routing already beginning per AIS data [+5.9pp] and insurance rate spikes confirm market risk assessment [+4.2pp]. Confidence interval: <strong>34%–74%</strong>. This prediction has the highest confidence of the three — signal diversity is strong across radar, macro, and social layers.`,
+    evidence:[
+      {headline:'Three tankers alter course away from Hormuz', source:'radar_naval', score:95},
+      {headline:'Lloyd\'s of London increases Gulf war-risk premiums', source:'news_api', score:87},
+      {headline:'Saudi Arabia opens East-West pipeline as contingency', source:'core_news', score:79},
+      {headline:'VLCC spot rates surge 28% in 24h', source:'news_api', score:74},
+    ]
+  }
+};
+
+let activeXAI='iran';
+
+function showXAI(key){
+  activeXAI=key;
+  document.querySelectorAll('#xai-tabs button').forEach((b,i)=>{
+    b.className=(['iran','us','ship'][i]===key)?'btn btn-cyan btn-sm':'btn btn-ghost btn-sm';
+  });
+
+  const d=XAI_DATA[key];
+  const maxVal=Math.max(...d.attrs.map(a=>Math.abs(a.val)));
+
+  document.getElementById('xai-waterfall').innerHTML=d.attrs.map(a=>{
+    const pct=Math.min(48,a.val/maxVal*48);
+    const isPos=a.val>0;
+    return `<div class="attr-row">
+      <div class="attr-label">${a.label}</div>
+      <div class="attr-bar-wrap">
+        <div class="attr-zero"></div>
+        <div class="attr-bar ${isPos?'attr-pos':'attr-neg'}" style="width:${Math.abs(pct)}%"></div>
+      </div>
+      <div class="attr-val ${isPos?'attr-pos-text':'attr-neg-text'}">${isPos?'+':''}${a.val.toFixed(1)}pp</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('xai-explanation').innerHTML=d.explanation;
+
+  document.getElementById('xai-uncertainty').innerHTML=`
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="font-size:11px;color:var(--text1)">Epistemic (model) uncertainty</span>
+        <span style="font-size:11px;color:var(--amber)">Moderate</span>
+      </div>
+      <div style="height:5px;background:var(--border);border-radius:3px"><div style="width:42%;height:100%;background:var(--amber);border-radius:3px"></div></div>
+      <div style="font-size:9px;color:var(--text3);margin-top:3px">Feature vector at 1.4σ from training mean — mild extrapolation</div>
+    </div>
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="font-size:11px;color:var(--text1)">Aleatoric (data) uncertainty</span>
+        <span style="font-size:11px;color:var(--green)">Low</span>
+      </div>
+      <div style="height:5px;background:var(--border);border-radius:3px"><div style="width:22%;height:100%;background:var(--green);border-radius:3px"></div></div>
+      <div style="font-size:9px;color:var(--text3);margin-top:3px">Strong cross-source signal agreement (0.74)</div>
+    </div>
+    <div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="font-size:11px;color:var(--text1)">Temporal decay (7-day horizon)</span>
+        <span style="font-size:11px;color:var(--amber)">−21% confidence</span>
+      </div>
+      <div style="height:5px;background:var(--border);border-radius:3px"><div style="width:55%;height:100%;background:var(--cyan2);border-radius:3px"></div></div>
+      <div style="font-size:9px;color:var(--text3);margin-top:3px">~8% confidence decay per 24h of forecast horizon</div>
+    </div>`;
+
+  document.getElementById('xai-evidence').innerHTML=d.evidence.map(e=>`
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div class="sig-dot ${e.score>=85?'sig-green':'sig-amber'}" style="margin-top:4px"></div>
+      <div style="flex:1">
+        <div style="font-size:11px;color:var(--text1);margin-bottom:2px">${e.headline}</div>
+        <div style="font-size:9px;color:var(--text3)">${e.source} · relevance ${e.score}</div>
+      </div>
+      <div style="font-size:11px;font-weight:700;color:var(--cyan)">${e.score}</div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  LIVE TICKER
+// ═══════════════════════════════════════════════════════════════════════════
+const TICK_EVENTS=[
+  '<span>⚡ osint_war</span> IRGC patrol vessels reported in Hormuz transit lane · impact 82',
+  '<span>📡 radar_air</span> KC-135 tanker sorties +34% above 72h baseline · escalation signal',
+  '<span>📰 core_news</span> Pentagon: "All options remain on the table" · source: AP',
+  '<span>⚓ radar_naval</span> USS Gerald Ford CSG position updated · Red Sea entry confirmed',
+  '<span>📈 macro</span> Brent crude +4.2% intraday · VLCC spot rates +28% in 24h',
+  '<span>🐦 social_x</span> GeoConfirmed: Three VLCCs alter course away from Hormuz',
+  '<span>📡 radar_air</span> E-3 Sentry AWACS orbiting Gulf region · airspace monitoring active',
+  '<span>📰 osint_war</span> Bellingcat: Satellite imagery shows naval activity near Bandar Abbas',
+  '<span>⚠️ alert</span> Risk threshold breached · score 71 · anomaly +22pp spike detected',
+  '<span>💱 macro</span> USD/IRR volatility spike · Gold +1.8% · safe-haven flows detected',
+];
+
+function buildTicker(){
+  const events=[...TICK_EVENTS,...TICK_EVENTS];
+  document.getElementById('tick-inner').innerHTML=events.map(e=>`<div class="tick-event">${e}</div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  TRUTH TRACKING LAYER
+// ═══════════════════════════════════════════════════════════════════════════
+const TRUTH_LOG=[
+  {pred:'Iran-linked Strike (7d)',     forecast:62, outcome:true,  date:'Mar 18'},
+  {pred:'Shipping Disruption (7d)',    forecast:58, outcome:true,  date:'Mar 18'},
+  {pred:'US Military Escalation (7d)',forecast:41, outcome:false, date:'Mar 18'},
+  {pred:'Iran-linked Strike (7d)',     forecast:34, outcome:false, date:'Mar 11'},
+  {pred:'Shipping Disruption (7d)',    forecast:71, outcome:true,  date:'Mar 11'},
+  {pred:'US Military Escalation (7d)',forecast:29, outcome:false, date:'Mar 11'},
+  {pred:'Iran-linked Strike (7d)',     forecast:48, outcome:true,  date:'Mar 04'},
+  {pred:'Shipping Disruption (7d)',    forecast:55, outcome:true,  date:'Mar 04'},
+  {pred:'US Military Escalation (7d)',forecast:52, outcome:true,  date:'Mar 04'},
+  {pred:'Iran-linked Strike (7d)',     forecast:22, outcome:false, date:'Feb 25'},
+  {pred:'Shipping Disruption (7d)',    forecast:39, outcome:false, date:'Feb 25'},
+  {pred:'US Military Escalation (7d)',forecast:18, outcome:false, date:'Feb 25'},
+];
+
+const TRUTH_PENDING=[
+  {pred:'Iran-linked Strike (7d)',      forecast:47, horizon:'7 days', made:'Today 11:42 UTC'},
+  {pred:'US Military Escalation (7d)',  forecast:33, horizon:'7 days', made:'Today 11:42 UTC'},
+  {pred:'Shipping Disruption (7d)',     forecast:52, horizon:'7 days', made:'Today 11:42 UTC'},
+];
+
+function brierScore(log){
+  return log.reduce((sum,r)=>{ const o=r.outcome?1:0; const p=r.forecast/100; return sum+(p-o)**2; },0)/log.length;
+}
+
+function calibrationData(log){
+  const buckets=Array.from({length:5},()=>({total:0,hits:0,mid:0}));
+  log.forEach(r=>{
+    const bi=Math.min(4,Math.floor(r.forecast/20));
+    buckets[bi].total++;
+    if(r.outcome) buckets[bi].hits++;
+    buckets[bi].mid=(bi*20+10);
+  });
+  return buckets.filter(b=>b.total>0).map(b=>({forecast:b.mid,observed:b.total>0?b.hits/b.total*100:0,n:b.total}));
+}
+
+function initTruthTracker(){
+  const brier=brierScore(TRUTH_LOG);
+  const correct=TRUTH_LOG.filter(r=>(r.forecast>=50)===r.outcome).length;
+  const acc=(correct/TRUTH_LOG.length*100).toFixed(0);
+  const calPts=calibrationData(TRUTH_LOG);
+  const calErr=(calPts.reduce((s,p)=>s+Math.abs(p.forecast-p.observed),0)/calPts.length).toFixed(1);
+
+  set('tt-acc',acc+'%');
+  set('tt-brier',brier.toFixed(3));
+  set('tt-cal',calErr+'%');
+  set('tt-n',TRUTH_LOG.length+'');
+
+  document.getElementById('tt-log').innerHTML=TRUTH_LOG.map(r=>{
+    const err=Math.abs(r.forecast/100-(r.outcome?1:0));
+    const brier_r=(err*err).toFixed(3);
+    const errPP=Math.abs(r.forecast-(r.outcome?100:0));
+    return `<tr>
+      <td style="font-size:11px">${r.pred}</td>
+      <td style="color:var(--cyan)">${r.forecast}%</td>
+      <td class="${r.outcome?'outcome-yes':'outcome-no'}">${r.outcome?'✓ YES':'✗ NO'}</td>
+      <td style="color:${errPP>30?'var(--red)':errPP>15?'var(--amber)':'var(--green)'}">${errPP>0?'+':''}${errPP}pp</td>
+      <td style="color:var(--text2)">${brier_r}</td>
+    </tr>`;
+  }).join('');
+
+  drawCalibrationCurve(calPts);
+
+  document.getElementById('tt-category').innerHTML=[
+    {cat:'Strike Predictions',    acc:67, brier:0.21, n:4, color:'var(--red)'},
+    {cat:'Shipping Disruptions',  acc:75, brier:0.17, n:4, color:'var(--amber)'},
+    {cat:'US Escalation',         acc:75, brier:0.18, n:4, color:'var(--blue)'},
+  ].map(c=>`
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="font-size:11px;color:var(--text1)">${c.cat}</span>
+        <span style="font-size:11px;font-weight:700;color:${c.color}">${c.acc}% accuracy</span>
+      </div>
+      <div style="font-size:9px;color:var(--text3);margin-bottom:4px">Brier: ${c.brier} · n=${c.n} predictions</div>
+      <div class="brier-bar"><div class="brier-fill" style="width:${c.acc}%;background:${c.color}"></div></div>
+    </div>`).join('');
+
+  document.getElementById('tt-pending').innerHTML=TRUTH_PENDING.map(p=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span class="outcome-pending">PENDING</span>
+      <div style="flex:1">
+        <span style="font-size:11px;color:var(--text1)">${p.pred}</span>
+        <span style="font-size:9px;color:var(--text3);margin-left:10px">Made: ${p.made}</span>
+      </div>
+      <div style="font-size:11px;font-weight:700;color:var(--cyan)">${p.forecast}% P50</div>
+      <span style="font-size:9px;color:var(--text3)">Resolves in ${p.horizon}</span>
+    </div>`).join('');
+}
+
+function drawCalibrationCurve(pts){
+  const svg=document.getElementById('tt-calib');
+  const W=svg.clientWidth||400, H=220;
+  const pad={l:36,r:20,t:20,b:36};
+  const cw=W-pad.l-pad.r, ch=H-pad.t-pad.b;
+  let html='';
+
+  // Grid
+  for(let i=0;i<=4;i++){
+    const y=pad.t+ch*(1-i/4), x=pad.l+cw*i/4;
+    html+=`<line x1="${pad.l}" y1="${y}" x2="${pad.l+cw}" y2="${y}" stroke="#1e3050" stroke-width="1"/>`;
+    html+=`<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t+ch}" stroke="#1e3050" stroke-width="1"/>`;
+    html+=`<text x="${pad.l-4}" y="${y+3}" fill="#64748b" font-size="9" font-family="system-ui" text-anchor="end">${i*25}%</text>`;
+    html+=`<text x="${x}" y="${H-8}" fill="#64748b" font-size="9" font-family="system-ui" text-anchor="middle">${i*25}%</text>`;
+  }
+
+  // Perfect calibration line
+  html+=`<line x1="${pad.l}" y1="${pad.t+ch}" x2="${pad.l+cw}" y2="${pad.t}" stroke="#1e3050" stroke-width="1.5" stroke-dasharray="4,3"/>`;
+  html+=`<text x="${pad.l+cw-50}" y="${pad.t+12}" fill="#64748b" font-size="9" font-family="system-ui">Perfect</text>`;
+
+  // Actual calibration line
+  if(pts.length>1){
+    const line=pts.map((p,i)=>{
+      const x=pad.l+cw*p.forecast/100, y=pad.t+ch*(1-p.observed/100);
+      return `${i?'L':'M'}${x},${y}`;
+    }).join(' ');
+    html+=`<path d="${line}" fill="none" stroke="#22d3ee" stroke-width="2"/>`;
+  }
+
+  // Data points
+  pts.forEach(p=>{
+    const x=pad.l+cw*p.forecast/100, y=pad.t+ch*(1-p.observed/100);
+    const err=Math.abs(p.forecast-p.observed);
+    const col=err>20?'#ef4444':err>10?'#f59e0b':'#10b981';
+    html+=`<circle cx="${x}" cy="${y}" r="6" fill="${col}" opacity=".85"/>`;
+    html+=`<text x="${x}" y="${y-9}" fill="#94a3b8" font-size="9" font-family="system-ui" text-anchor="middle">n=${p.n}</text>`;
+  });
+
+  // Axis labels
+  html+=`<text x="${pad.l+cw/2}" y="${H-1}" fill="#64748b" font-size="9" font-family="system-ui" text-anchor="middle">Forecast Probability</text>`;
+  html+=`<text x="10" y="${pad.t+ch/2}" fill="#64748b" font-size="9" font-family="system-ui" text-anchor="middle" transform="rotate(-90,10,${pad.t+ch/2})">Observed Frequency</text>`;
+
+  // Legend
+  html+=`<circle cx="${pad.l+10}" cy="${pad.t+8}" r="5" fill="#22d3ee"/>
+         <text x="${pad.l+19}" y="${pad.t+12}" fill="#94a3b8" font-size="9" font-family="system-ui">GIP Model</text>
+         <line x1="${pad.l+70}" y1="${pad.t+8}" x2="${pad.l+85}" y2="${pad.t+8}" stroke="#1e3050" stroke-width="1.5" stroke-dasharray="3,2"/>
+         <text x="${pad.l+89}" y="${pad.t+12}" fill="#64748b" font-size="9" font-family="system-ui">Perfect</text>`;
+
+  svg.innerHTML=html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ASK INTEL — Q&A ENGINE
+// ═══════════════════════════════════════════════════════════════════════════
+const QA_SUGGESTIONS=[
+  'What is the current risk level?',
+  'Which prediction has the highest probability?',
+  'What is driving the Iran strike risk?',
+  'How reliable is the satellite signal?',
+  'What does a crisis scenario look like?',
+  'Explain the shipping disruption risk',
+  'What signals support naval escalation?',
+];
+
+function buildQAContext(){
+  const r=computeRisk(currentInputs);
+  const p=getBaselinePreds();
+  document.getElementById('qa-context').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="font-size:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--text3)">Risk Score</span>
+        <span style="font-weight:700;color:${r.risk>=66?'var(--red)':r.risk>=42?'var(--amber)':'var(--green)'};float:right">${r.risk.toFixed(0)} (${r.level})</span>
+      </div>
+      <div style="font-size:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--text3)">Scenario</span>
+        <span style="font-weight:700;color:var(--cyan);float:right;text-transform:uppercase">${currentScenario}</span>
+      </div>
+      <div style="font-size:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--text3)">Iran Strike P50</span>
+        <span style="font-weight:700;color:var(--red);float:right">${p.iran.p50.toFixed(1)}%</span>
+      </div>
+      <div style="font-size:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--text3)">US Escalation P50</span>
+        <span style="font-weight:700;color:var(--amber);float:right">${p.us.p50.toFixed(1)}%</span>
+      </div>
+      <div style="font-size:10px;padding:6px 0">
+        <span style="color:var(--text3)">Shipping Risk P50</span>
+        <span style="font-weight:700;color:var(--cyan);float:right">${p.ship.p50.toFixed(1)}%</span>
+      </div>
+      <div style="font-size:10px;padding:6px 0">
+        <span style="color:var(--text3)">Active Signals</span>
+        <span style="font-weight:700;color:var(--green);float:right">6 / 8 layers</span>
+      </div>
+    </div>`;
+
+  document.getElementById('qa-signals').innerHTML=SIGNAL_LAYERS.map(l=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
+      <div class="sig-dot sig-${l.status}"></div>
+      <span style="font-size:10px;color:var(--text2);flex:1">${l.name}</span>
+      <span style="font-size:9px;color:var(--text3)">${l.status==='red'?'Offline':l.events+' events'}</span>
+    </div>`).join('');
+
+  document.getElementById('qa-suggestions').innerHTML=QA_SUGGESTIONS.map(q=>
+    `<span class="qa-suggestion" onclick="askQuestion('${q}')">${q}</span>`
+  ).join('');
+}
+
+function generateIntelResponse(question){
+  const q=question.toLowerCase();
+  const r=computeRisk(currentInputs);
+  const p=getBaselinePreds();
+  const f=computeFeatures(currentInputs);
+
+  // Risk level queries
+  if(q.includes('risk level')||q.includes('current risk')||q.includes('risk score')){
+    const col=r.risk>=66?'critical':r.risk>=42?'elevated':'contained';
+    return `Current composite risk score is <strong>${r.risk.toFixed(0)}/100</strong> — status: <strong style="color:${r.risk>=66?'#fca5a5':r.risk>=42?'#fcd34d':'#6ee7b7'}">${r.level}</strong>.<br><br>
+Breakdown: Geopolitical tension <strong>${r.geoTension.toFixed(0)}</strong> (×0.47 weight) + Market stress <strong>${r.mktStress.toFixed(0)}</strong> (×0.40) + Anomaly score <strong>${r.anomaly.toFixed(0)}</strong> (×0.13).<br><br>
+Primary driver is geopolitical tension elevated by air/radar activity (+${(f.airOps/14*100*0.47*0.28).toFixed(1)}pp) and negative sentiment (+${(f.negSentiment*100*0.47*0.19).toFixed(1)}pp). Scenario mode: <strong>${currentScenario}</strong>.`;
+  }
+
+  // Highest probability prediction
+  if(q.includes('highest probability')||q.includes('most likely')||q.includes('top prediction')){
+    const preds=[
+      {name:'Shipping Disruption',p:p.ship.p50},
+      {name:'Iran-linked Strike',p:p.iran.p50},
+      {name:'US Military Escalation',p:p.us.p50},
+    ].sort((a,b)=>b.p-a.p);
+    return `The highest-probability prediction is <strong>${preds[0].name}</strong> at <strong>${preds[0].p.toFixed(1)}% P50</strong> (7-day horizon).<br><br>
+Full ranking: (1) ${preds[0].name} ${preds[0].p.toFixed(1)}% · (2) ${preds[1].name} ${preds[1].p.toFixed(1)}% · (3) ${preds[2].name} ${preds[2].p.toFixed(1)}%.<br><br>
+The shipping disruption is supported by the strongest cross-source signal agreement — radar_naval + AIS data + commodity futures all aligned. See the XAI tab for full attribution breakdown.`;
+  }
+
+  // Iran strike specific
+  if(q.includes('iran')||q.includes('strike risk')){
+    return `Iran-linked strike probability: <strong>${p.iran.p50.toFixed(1)}%</strong> P50 (P10: ${p.iran.p10.toFixed(0)}% · P90: ${p.iran.p90.toFixed(0)}%) within 7 days.<br><br>
+Top drivers: <strong>Air/ISR activity +34%</strong> above baseline (+9.2pp), escalatory rhetoric at ${Math.round(f.escalationKwRatio*100)}% of verified headlines (+7.8pp), IRGC vessels logged in Hormuz transit lane (+6.2pp).<br><br>
+Partial offsets: diplomatic back-channel signals still active (−3.2pp), historical base rate prior ~22% (−2.1pp).<br><br>
+Confidence: ${XAI_DATA.iran.conf}%. Epistemic uncertainty: moderate — feature vector at 1.4σ from training mean.`;
+  }
+
+  // Shipping disruption
+  if(q.includes('shipping')||q.includes('hormuz')||q.includes('tanker')){
+    return `Shipping disruption is rated <strong>${p.ship.p50.toFixed(1)}% P50</strong> — the <strong>highest-confidence prediction</strong> in the current cycle.<br><br>
+Evidence: Three VLCCs have already altered course away from Hormuz (AIS-confirmed, conf 0.93). Hormuz naval pressure driving +11.2pp, commodity shock +8.4pp, insurance rate spike confirming market perception (+4.2pp).<br><br>
+P10–P90 band: <strong>${p.ship.p10.toFixed(0)}%–${p.ship.p90.toFixed(0)}%</strong>. Signal diversity is strong — radar_naval, macro/commodity, and core_news all aligned. Coast Guard escort deployment provides a partial −2.1pp offset.`;
+  }
+
+  // Satellite signal
+  if(q.includes('satellite')||q.includes('signal')||q.includes('layer')||q.includes('reliable')){
+    return `Signal layer status: <strong>6 of 8 layers are active</strong>.<br><br>
+🟢 <strong>Online</strong>: core_news (14 events, 4s ago), news_api (22 events), osint_war (9 events), social_x (18 events), social_reddit (11 events).<br>
+🟡 <strong>Degraded</strong>: radar_air (3 events, 34s latency), radar_naval (2 events, 41s latency).<br>
+🔴 <strong>Offline</strong>: satellite (0 events, 3m stale).<br><br>
+The satellite feed outage reduces confidence in ground/naval movement verification. Predictions currently relying on AIS + OSINT as proxy. Impact: +8% epistemic uncertainty on all predictions until satellite feed is restored.`;
+  }
+
+  // Crisis scenario
+  if(q.includes('crisis')||q.includes('extreme')||q.includes('scenario')){
+    const crisisInp={...currentInputs, negSent:75, crisisProb:65, airOps:22};
+    const crisisF=computeFeatures(crisisInp);
+    const crisisP=runPredEngine(crisisF,800);
+    return `Under <strong>Crisis scenario</strong> (multiplier ×1.35), model outputs shift significantly:<br><br>
+Iran Strike: <strong>${crisisP.iran.p50.toFixed(1)}%</strong> P50 (vs. baseline ${p.iran.p50.toFixed(1)}%)<br>
+US Escalation: <strong>${crisisP.us.p50.toFixed(1)}%</strong> P50 (vs. ${p.us.p50.toFixed(1)}%)<br>
+Shipping Disruption: <strong>${crisisP.ship.p50.toFixed(1)}%</strong> P50 (vs. ${p.ship.p50.toFixed(1)}%)<br><br>
+Under <strong>Extreme scenario</strong> (×1.80), a Hormuz closure becomes the most likely outcome within 72h. The most probable event chain: Strike → Market Shock (see Event Chains tab). Use the What-If Engine to explore specific parameter combinations.`;
+  }
+
+  // Naval signals
+  if(q.includes('naval')||q.includes('carrier')||q.includes('fleet')){
+    return `Naval signal assessment: <strong>radar_naval degraded</strong> (41s latency) but 2 high-confidence events recorded.<br><br>
+Key signals: USS Gerald Ford CSG entered Red Sea (conf 0.89, +9.2 risk pts) — confirmed via MarineTraffic AIS. Three VLCCs altered Hormuz course (conf 0.93, +7.7 risk pts).<br><br>
+IRGC fast-attack craft movement in Hormuz transit lane was confirmed via AIS + satellite cross-reference (conf 0.82). This combination — US carrier repositioning + Iranian naval activity — is the primary driver of the ${p.ship.p50.toFixed(0)}% shipping disruption probability.<br><br>
+Recommended action: restore satellite feed to improve cross-source verification for naval signals.`;
+  }
+
+  // What-if / simulation
+  if(q.includes('what if')||q.includes('simulate')||q.includes('scenario engine')){
+    return `The What-If Engine (tab available in sidebar) lets you adjust 8 parameters in real time:<br><br>
+Sliders: Military Activity, Economic Disruption, Social Escalation, Diplomatic Tension, Proxy Mobilization.<br>
+Toggles: US Carrier Deployed, Chokepoint Closure Threat, Oil Route Disruption.<br><br>
+Every change triggers a full prediction engine re-run (Bayesian sigmoid + 800 MC iterations). Results show P10/P50/P90 with deltas vs. baseline. You can save up to 3 scenarios (Baseline, A, B) for side-by-side comparison.`;
+  }
+
+  // Brier score / accuracy
+  if(q.includes('brier')||q.includes('accuracy')||q.includes('calibrat')){
+    const log=TRUTH_LOG;
+    const brier=brierScore(log).toFixed(3);
+    const acc=Math.round(log.filter(r=>(r.forecast>=50)===r.outcome).length/log.length*100);
+    return `Model performance over the last ${log.length} resolved predictions:<br><br>
+<strong>Brier Score: ${brier}</strong> (0 = perfect, 1 = worst; below 0.25 is good)<br>
+<strong>Binary accuracy: ${acc}%</strong> (prediction above 50% treated as YES)<br><br>
+Shipping disruption category performs best (75% accuracy, Brier 0.17). Strike predictions are hardest to calibrate (67%, Brier 0.21) due to inherent aleatory uncertainty. See the Truth Tracker tab for calibration curve and full log.`;
+  }
+
+  // Default / catch-all
+  return `I've processed your query against the current intelligence state. Here's a summary:<br><br>
+<strong>Risk Level:</strong> ${r.level} (${r.risk.toFixed(0)}/100) · Scenario: ${currentScenario}<br>
+<strong>Top Prediction:</strong> Shipping Disruption at ${p.ship.p50.toFixed(1)}% (7d)<br>
+<strong>Active Signals:</strong> 6/8 layers · Satellite offline<br>
+<strong>Key Driver:</strong> Naval pressure in Hormuz (conf 0.93, +9.2 risk pts)<br><br>
+For deeper analysis, try asking about specific predictions (Iran/US/Shipping), signal layers, scenarios, or model performance. You can also explore the XAI tab for attribution breakdowns or the Truth Tracker for historical accuracy.`;
+}
+
+function sendQA(){
+  const input=document.getElementById('qa-input');
+  const q=input.value.trim();
+  if(!q) return;
+  askQuestion(q);
+  input.value='';
+}
+
+function askQuestion(q){
+  const hist=document.getElementById('qa-history');
+  const ts=new Date().toLocaleTimeString();
+
+  hist.innerHTML+=`<div class="qa-msg qa-user">
+    <div class="qa-label">You · ${ts}</div>
+    <div class="qa-bubble">${q}</div>
+  </div>`;
+
+  // Slight delay for realism
+  setTimeout(()=>{
+    const answer=generateIntelResponse(q);
+    hist.innerHTML+=`<div class="qa-msg qa-intel">
+      <div class="qa-label">GIP v2.0 · ${new Date().toLocaleTimeString()}</div>
+      <div class="qa-bubble">${answer}</div>
+    </div>`;
+    hist.scrollTop=hist.scrollHeight;
+    buildQAContext();
+  },400);
+
+  hist.scrollTop=hist.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  NAVIGATION & SCENARIO
+// ═══════════════════════════════════════════════════════════════════════════
+function showTab(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  event.currentTarget.classList.add('active');
+
+  if(id==='predictions') updatePredictions();
+  if(id==='whatif'){ updateWhatIf(); if(!savedScenarios.baseline) savedScenarios.baseline=getBaselinePreds(); renderScenarioCompare(null); }
+  if(id==='chains') showChain(0);
+  if(id==='xai') showXAI('iran');
+  if(id==='truth') initTruthTracker();
+  if(id==='ask'){ buildQAContext(); }
+  if(id==='mapview'){
+    // Small delay so panel is visible before Leaflet tries to measure
+    setTimeout(()=>{ initMapView(); updateMapTime(); },50);
+  }
+}
+
+function setMapScenario(s){
+  currentScenario=s;
+  ['base','cris','ext'].forEach((k,i)=>{
+    const btn=document.getElementById('map-sc-'+k);
+    if(btn) btn.className=['baseline','crisis','extreme'][i]===s?'btn btn-cyan btn-sm':'btn btn-ghost btn-sm';
+  });
+  savedScenarios.baseline=null;
+  if(gipMap) renderIntelPanel();
+}
+
+function updateMapTime(){
+  const el=document.getElementById('map-time');
+  if(el) el.textContent=new Date().toLocaleTimeString()+' UTC · '+currentScenario.toUpperCase();
+}
+
+function setScenario(s){
+  currentScenario=s;
+  document.querySelectorAll('#tab-overview .btn-group .btn').forEach((b,i)=>{
+    const scenarios=['baseline','crisis','extreme'];
+    b.className=scenarios[i]===s?'btn btn-cyan btn-sm':'btn btn-ghost btn-sm';
+  });
+  savedScenarios.baseline=null;
+  updateOverview();
+  if(document.getElementById('tab-predictions').classList.contains('active')) updatePredictions();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+function set(id,val){ const el=document.getElementById(id); if(el) el.textContent=val; }
+function style(id,prop,val){ const el=document.getElementById(id); if(el) el.style[prop]=val; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════════════════
+function init(){
+  buildTicker();
+  updateOverview();
+  // Auto-refresh overview every 8s
+  setInterval(()=>{
+    // Simulate live data drift
+    currentInputs.negSent=clamp(currentInputs.negSent+(Math.random()-.45)*2,20,80);
+    currentInputs.spikeRatio=clamp(currentInputs.spikeRatio+(Math.random()-.48)*.15,.5,5);
+    currentInputs.crisisProb=clamp(currentInputs.crisisProb+(Math.random()-.47)*1.5,5,75);
+    updateOverview();
+    if(document.getElementById('tab-predictions').classList.contains('active')) updatePredictions();
+    if(document.getElementById('tab-whatif').classList.contains('active')) updateWhatIf();
+  },8000);
+}
+
+window.addEventListener('load', init);
+window.addEventListener('resize', ()=>{
+  if(document.getElementById('tab-predictions').classList.contains('active')) drawFanChart();
+  if(document.getElementById('tab-chains').classList.contains('active')) drawDAG(activeChain);
+});
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  MAP VIEW — LEAFLET + INCIDENT FEED + INTEL PANEL
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+//  LIVE FEED ENGINE — GDELT + RSS ingestion
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Static fallback incidents (shown while live data loads) ─────────────────
+const FALLBACK_INCIDENTS=[
+  {id:1,  lat:35.69,  lng:51.39,  loc:'Tehran',          region:'Middle East', cat:'Politics',  sev:'Medium', ago:'16m', headline:'Mojtaba Khamenei rumoured injury — leadership continuity unchanged', src:'aljazeera.com', layer:'core_news',   tier:1, rel:91, desc:'Senior IRGC sources confirm regime continuity protocols active.', ts:Date.now()-960000},
+  {id:2,  lat:32.08,  lng:34.78,  loc:'Tel Aviv',        region:'Middle East', cat:'Military',  sev:'Medium', ago:'20m', headline:'IDF demolishes structures on Lebanon–Israel border zone',           src:'r/war',         layer:'social_reddit',tier:3, rel:85, desc:'Satellite imagery corroborates demolitions in Metula corridor.',    ts:Date.now()-1200000},
+  {id:3,  lat:27.18,  lng:56.27,  loc:'Hormuz Strait',   region:'Middle East', cat:'Naval',     sev:'High',   ago:'34m', headline:'IRGC fast-attack craft spotted in Hormuz transit lane — 3 vessels', src:'AIS+osint_war',  layer:'osint_war',   tier:1, rel:94, desc:'Three IRGC Peykaap-class FACs confirmed at Hormuz grid.',             ts:Date.now()-2040000},
+  {id:4,  lat:24.80,  lng:59.70,  loc:'Gulf of Oman',    region:'Middle East', cat:'Naval',     sev:'High',   ago:'41m', headline:'Three VLCCs alter course away from Hormuz — AIS confirmed',         src:'MarineTraffic',  layer:'radar_naval', tier:1, rel:95, desc:'Celestial Crown, Nordic Orion, SCF Primorye deviate eastward.',      ts:Date.now()-2460000},
+  {id:5,  lat:33.33,  lng:44.44,  loc:'Baghdad',         region:'Middle East', cat:'Proxy',     sev:'High',   ago:'52m', headline:'Kata\'ib Hezbollah: resistance axis on full alert',                  src:'social_x',       layer:'social_x',    tier:2, rel:82, desc:'Verified Telegram channel posts operational readiness declaration.',  ts:Date.now()-3120000},
+  {id:6,  lat:38.91,  lng:-77.04, loc:'Washington D.C.', region:'Americas',    cat:'Military',  sev:'High',   ago:'45m', headline:'USS Gerald Ford CSG enters Red Sea — confirmed via AIS',            src:'MarineTraffic',  layer:'radar_naval', tier:1, rel:90, desc:'CVN-78 + escorts inside Bab-el-Mandeb. Air wing sortie rate elevated.',ts:Date.now()-2700000},
+  {id:7,  lat:51.51,  lng:-0.13,  loc:'London',          region:'Europe',      cat:'Economics', sev:'Medium', ago:'1h',  headline:'Lloyd\'s raises Gulf war-risk premiums 18% effective immediately',  src:'Lloyd\'s feed',  layer:'news_api',    tier:1, rel:91, desc:'Persian Gulf listed area repriced across all underwriters.',          ts:Date.now()-3600000},
+  {id:8,  lat:40.71,  lng:-74.01, loc:'New York',        region:'Americas',    cat:'Economics', sev:'Medium', ago:'35m', headline:'Brent crude +4.2% intraday — VLCC spot rates surge 28%',           src:'Bloomberg',      layer:'news_api',    tier:1, rel:94, desc:'WTI follows at +3.8%. Goldman raises 30-day Brent target to $98.',    ts:Date.now()-2100000},
+  {id:9,  lat:55.75,  lng:37.62,  loc:'Moscow',          region:'Eurasia',     cat:'Diplomacy', sev:'Medium', ago:'5h',  headline:'Russia warns against foreign intervention in Gulf — Zakharova',     src:'TASS',           layer:'core_news',   tier:1, rel:74, desc:'Statement signals opposition to US carrier presence.',               ts:Date.now()-18000000},
+  {id:10, lat:48.86,  lng:2.35,   loc:'Paris',           region:'Europe',      cat:'Diplomacy', sev:'Normal', ago:'2h',  headline:'French FM calls for restraint; back-channel diplomacy still open',  src:'AFP',            layer:'core_news',   tier:1, rel:77, desc:'Séjourné cites open communication with Tehran envoy.',               ts:Date.now()-7200000},
+];
+
+// ── Live data state ──────────────────────────────────────────────────────────
+let liveIncidents = [...FALLBACK_INCIDENTS];
+let feedStatus = 'loading'; // 'live' | 'simulated' | 'loading' | 'error'
+let lastFetchTime = null;
+let fetchAttempts = 0;
+
+// ── Location keyword → geocoords + metadata ──────────────────────────────────
+const LOC_MAP = [
+  {kw:['tehran','iran','irgc','khamenei','isfahan','tabriz','shiraz','mashhad','iranian','rouhani'],              lat:35.69, lng:51.39, loc:'Tehran',         region:'Middle East'},
+  {kw:['israel','tel aviv','idf','netanyahu','jerusalem','haifa','beersheba','israeli'],                          lat:32.08, lng:34.78, loc:'Tel Aviv',        region:'Middle East'},
+  {kw:['gaza','hamas','rafah','khan younis','jabalia','deir al-balah'],                                           lat:31.35, lng:34.45, loc:'Gaza',            region:'Middle East'},
+  {kw:['beirut','lebanon','hezbollah','lebanese','south lebanon','litani'],                                       lat:33.89, lng:35.50, loc:'Beirut',          region:'Middle East'},
+  {kw:['hormuz','strait','vlcc','tanker','shipping lane','ais','hormuz strait'],                                  lat:27.18, lng:56.27, loc:'Hormuz Strait',   region:'Middle East'},
+  {kw:['gulf of oman','oman sea','musandam'],                                                                     lat:24.80, lng:59.70, loc:'Gulf of Oman',    region:'Middle East'},
+  {kw:['baghdad','iraq','iraqi','kata\'ib','pmu','al-hashd'],                                                     lat:33.33, lng:44.44, loc:'Baghdad',         region:'Middle East'},
+  {kw:['damascus','syria','syrian','deir ez-zor','aleppo'],                                                       lat:33.51, lng:36.29, loc:'Damascus',        region:'Middle East'},
+  {kw:['riyadh','saudi','aramco','mbs','bin salman'],                                                             lat:24.69, lng:46.72, loc:'Riyadh',          region:'Middle East'},
+  {kw:['abu dhabi','uae','dubai','emirati','emirates'],                                                           lat:24.47, lng:54.37, loc:'Abu Dhabi',       region:'Middle East'},
+  {kw:['muscat','oman','omani','busaidi'],                                                                        lat:23.59, lng:58.59, loc:'Muscat',          region:'Middle East'},
+  {kw:['kuwait','kuwaiti'],                                                                                       lat:29.38, lng:47.99, loc:'Kuwait City',     region:'Middle East'},
+  {kw:['doha','qatar','qatari'],                                                                                  lat:25.29, lng:51.53, loc:'Doha',            region:'Middle East'},
+  {kw:['ankara','turkey','turkish','erdogan','nato turkey'],                                                      lat:39.93, lng:32.86, loc:'Ankara',          region:'Europe'},
+  {kw:['kyiv','ukraine','ukrainian','zelensky','kharkiv','odessa','donbas','zaporizhzhia'],                       lat:50.45, lng:30.52, loc:'Kyiv',            region:'Eurasia'},
+  {kw:['moscow','russia','russian','kremlin','putin','lavrov','tass'],                                            lat:55.75, lng:37.62, loc:'Moscow',          region:'Eurasia'},
+  {kw:['beijing','china','chinese','xi jinping','pla'],                                                           lat:39.91, lng:116.39,loc:'Beijing',         region:'Asia'},
+  {kw:['taipei','taiwan','taiwanese'],                                                                            lat:25.03, lng:121.56,loc:'Taipei',          region:'Asia'},
+  {kw:['pyongyang','north korea','dprk','kim jong'],                                                              lat:39.02, lng:125.74,loc:'Pyongyang',       region:'Asia'},
+  {kw:['london','uk','britain','british','bbc','whitehall'],                                                      lat:51.51, lng:-0.13, loc:'London',          region:'Europe'},
+  {kw:['paris','france','french','macron','élysée','afp'],                                                        lat:48.86, lng:2.35,  loc:'Paris',           region:'Europe'},
+  {kw:['berlin','germany','german'],                                                                              lat:52.52, lng:13.40, loc:'Berlin',           region:'Europe'},
+  {kw:['brussels','nato','eu ','european union'],                                                                 lat:50.85, lng:4.35,  loc:'Brussels',        region:'Europe'},
+  {kw:['washington','pentagon','white house','biden','trump','us military','us forces'],                          lat:38.91, lng:-77.04,loc:'Washington D.C.', region:'Americas'},
+  {kw:['new york','wall street','bloomberg','crude oil','brent','wti'],                                           lat:40.71, lng:-74.01,loc:'New York',        region:'Americas'},
+  {kw:['red sea','bab','aden','houthi','yemen','sanaa'],                                                          lat:15.55, lng:42.55, loc:'Red Sea / Yemen', region:'Middle East'},
+  {kw:['pakistan','islamabad','karachi'],                                                                         lat:33.72, lng:73.06, loc:'Islamabad',       region:'Asia'},
+  {kw:['india','new delhi','modi'],                                                                               lat:28.61, lng:77.21, loc:'New Delhi',       region:'Asia'},
+  {kw:['kabul','afghanistan','taliban'],                                                                          lat:34.53, lng:69.17, loc:'Kabul',           region:'Asia'},
+];
+
+// ── Severity keyword sets ─────────────────────────────────────────────────────
+const SEV_KEYWORDS = {
+  High:   ['attack','strike','bomb','missile','killed','war','invasion','explosion','blockade','nuclear','destroy','assault','intercept','clash','fire','shot','rocket','armed conflict','airstrike','drone strike','naval clash'],
+  Medium: ['tension','escalation','threat','warning','sanction','military','alert','conflict','deploy','mobilize','posture','incident','provocation','confrontation','hostile','seizure','standoff'],
+};
+
+// ── Category keyword sets ────────────────────────────────────────────────────
+const CAT_KEYWORDS = {
+  Military:  ['soldier','army','force','troops','weapon','bomb','strike','attack','airstrike','idf','irgc','fighter','jets','drone','ballistic'],
+  Naval:     ['ship','naval','fleet','carrier','submarine','port','tanker','hormuz','strait','sea','maritime','vlcc','destroyer','frigate'],
+  Diplomacy: ['talks','diplomat','minister','united nations','peace','negotiat','treaty','summit','sanction','ambassador','ceasefire','accord'],
+  Economics: ['oil','crude','market','economic','trade','dollar','gold','supply','pipeline','barrel','brent','wti','inflation','gdp','tariff'],
+  Politics:  ['president','prime minister','leader','government','election','parliament','protest','coup','resign','cabinet','foreign policy'],
+  Proxy:     ['militia','hezbollah','hamas','houthi','proxy','resistance','faction','pmu','kata\'ib','islamic jihad','armed group'],
+};
+
+// ── Source tier classification ────────────────────────────────────────────────
+const TIER1_DOMAINS = ['reuters','ap.org','apnews','bloomberg','ft.com','wsj.com','nytimes','bbc','guardian','aljazeera','axios','politico'];
+const TIER2_DOMAINS = ['cnn','abc','nbc','cbs','fox','independent','telegraph','times','yahoo','msn','npr'];
+
+// ── Geocode article title → location ────────────────────────────────────────
+function inferLocation(title){
+  const t = title.toLowerCase();
+  for(const loc of LOC_MAP){
+    if(loc.kw.some(k => t.includes(k))) return loc;
+  }
+  // If nothing matched, return a small random jitter around Middle East
+  return { lat: 28 + (Math.random()-0.5)*8, lng: 48 + (Math.random()-0.5)*12,
+           loc: 'Middle East', region: 'Middle East' };
+}
+
+function inferSeverity(title){
+  const t = title.toLowerCase();
+  if(SEV_KEYWORDS.High.some(k => t.includes(k)))   return 'High';
+  if(SEV_KEYWORDS.Medium.some(k => t.includes(k))) return 'Medium';
+  return 'Normal';
+}
+
+function inferCategory(title){
+  const t = title.toLowerCase();
+  let best='Politics', bestScore=0;
+  for(const [cat, kws] of Object.entries(CAT_KEYWORDS)){
+    const score = kws.filter(k => t.includes(k)).length;
+    if(score > bestScore){ bestScore=score; best=cat; }
+  }
+  return best;
+}
+
+function inferTier(domain=''){
+  const d = domain.toLowerCase();
+  if(TIER1_DOMAINS.some(t => d.includes(t))) return 1;
+  if(TIER2_DOMAINS.some(t => d.includes(t))) return 2;
+  return 3;
+}
+
+function inferRelevance(title, sev, tier){
+  const t = title.toLowerCase();
+  let score = 50;
+  // Bump for high-relevance geopolitical terms
+  const hotwords = ['iran','israel','hormuz','nuclear','military','strike','naval','carrier','missile','war','escalation','hamas','hezbollah','houthi','russia','ukraine'];
+  hotwords.forEach(w => { if(t.includes(w)) score += 5; });
+  if(sev === 'High')   score += 15;
+  if(sev === 'Medium') score += 7;
+  if(tier === 1)       score += 8;
+  if(tier === 2)       score += 3;
+  return Math.min(99, Math.round(score));
+}
+
+function timeAgo(ts){
+  const diff = Math.floor((Date.now()-ts)/1000);
+  if(diff < 60)      return diff+'s';
+  if(diff < 3600)    return Math.floor(diff/60)+'m';
+  if(diff < 86400)   return Math.floor(diff/3600)+'h';
+  return Math.floor(diff/86400)+'d';
+}
+
+// ── GDELT API fetcher ─────────────────────────────────────────────────────────
+const GDELT_QUERIES = [
+  'iran military nuclear hormuz naval strike',
+  'israel idf hezbollah hamas military strike',
+  'ukraine russia war missile attack',
+  'oil tanker shipping disruption sanctions',
+];
+let gdeltQueryIdx = 0;
+
+async function fetchGDELT(){
+  const query = GDELT_QUERIES[gdeltQueryIdx % GDELT_QUERIES.length];
+  gdeltQueryIdx++;
+  const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=artlist&maxrecords=25&format=json&timespan=6h`;
+  const resp = await fetch(url, { mode:'cors', cache:'no-store' });
+  if(!resp.ok) throw new Error('GDELT HTTP '+resp.status);
+  const data = await resp.json();
+  return (data.articles || []).map((a,i) => {
+    const loc = inferLocation(a.title || '');
+    const sev = inferSeverity(a.title || '');
+    const cat = inferCategory(a.title || '');
+    const tier = inferTier(a.domain || '');
+    const ts = a.seendate ? parseGDELTDate(a.seendate) : Date.now()-i*180000;
+    return {
+      id: 'g_'+Date.now()+'_'+i,
+      lat:  loc.lat + (Math.random()-0.5)*0.8,
+      lng:  loc.lng + (Math.random()-0.5)*0.8,
+      loc:  loc.loc,
+      region: loc.region,
+      cat,  sev, tier,
+      ago:  timeAgo(ts),
+      ts,
+      headline: a.title || 'No title',
+      src:  a.domain || 'unknown',
+      layer: tier===1?'core_news':tier===2?'news_api':'social_reddit',
+      rel:  inferRelevance(a.title||'', sev, tier),
+      desc: `Live feed via GDELT. Source: ${a.domain||'unknown'}. Language: ${a.language||'en'}.`,
+      url:  a.url || '#',
+    };
+  });
+}
+
+function parseGDELTDate(s){
+  // Format: "20241201T143000Z"
+  try {
+    return new Date(s.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/,'$1-$2-$3T$4:$5:$6Z')).getTime();
+  } catch(e){ return Date.now(); }
+}
+
+// ── RSS via public CORS-enabled proxy ─────────────────────────────────────────
+const RSS_FEEDS = [
+  'https://feeds.bbci.co.uk/news/world/rss.xml',
+  'https://www.aljazeera.com/xml/rss/all.xml',
+  'https://rss.dw.com/rdf/rss-en-world',
+];
+
+async function fetchRSS(feedUrl){
+  const proxy = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}&count=15`;
+  const resp = await fetch(proxy, { mode:'cors', cache:'no-store' });
+  if(!resp.ok) throw new Error('RSS2JSON HTTP '+resp.status);
+  const data = await resp.json();
+  return (data.items||[]).map((item,i) => {
+    const title = item.title || '';
+    const loc = inferLocation(title);
+    const sev = inferSeverity(title);
+    const cat = inferCategory(title);
+    const ts = item.pubDate ? new Date(item.pubDate).getTime() : Date.now()-i*300000;
+    const domain = (item.link||'').replace(/https?:\/\/(www\.)?/,'').split('/')[0];
+    const tier = inferTier(domain || feedUrl);
+    return {
+      id: 'r_'+Date.now()+'_'+i,
+      lat:  loc.lat + (Math.random()-0.5)*0.8,
+      lng:  loc.lng + (Math.random()-0.5)*0.8,
+      loc:  loc.loc, region: loc.region,
+      cat, sev, tier,
+      ago:  timeAgo(ts), ts,
+      headline: title,
+      src:  domain || 'RSS',
+      layer: tier===1?'core_news':'news_api',
+      rel:  inferRelevance(title, sev, tier),
+      desc: item.description ? item.description.replace(/<[^>]+>/g,'').slice(0,200)+'…' : 'Via RSS feed.',
+      url:  item.link || '#',
+    };
+  });
+}
+
+// ── Master fetch orchestrator ─────────────────────────────────────────────────
+async function fetchLiveIntelligence(){
+  setFeedStatus('loading');
+  fetchAttempts++;
+  const results = [];
+  const errors  = [];
+
+  // Try GDELT
+  try {
+    const gdelt = await fetchGDELT();
+    results.push(...gdelt);
+  } catch(e){ errors.push('GDELT: '+e.message); }
+
+  // Try first RSS feed (rotate through feeds)
+  try {
+    const rssFeedUrl = RSS_FEEDS[(fetchAttempts-1) % RSS_FEEDS.length];
+    const rss = await fetchRSS(rssFeedUrl);
+    results.push(...rss);
+  } catch(e){ errors.push('RSS: '+e.message); }
+
+  if(results.length > 0){
+    // Deduplicate by headline similarity (first 60 chars)
+    const seen = new Set();
+    const deduped = results.filter(r => {
+      const key = r.headline.slice(0,60).toLowerCase();
+      if(seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+    // Sort newest first
+    deduped.sort((a,b) => b.ts - a.ts);
+    // Assign sequential IDs
+    deduped.forEach((r,i) => r.id = i+1);
+    liveIncidents = deduped;
+    lastFetchTime = Date.now();
+    setFeedStatus('live');
+    // Update prediction model from live signal density
+    updateModelFromLiveFeed(liveIncidents);
+  } else {
+    // All fetches failed — use fallback with aged timestamps
+    console.warn('Live fetch failed:', errors);
+    liveIncidents = FALLBACK_INCIDENTS.map(i => ({...i, ago: timeAgo(i.ts)}));
+    setFeedStatus('simulated');
+  }
+
+  renderFeed();
+  renderMapMarkers();
+  renderIntelPanel();
+  buildTicker(); // Refresh ticker with live headlines
+}
+
+// ── Update prediction model inputs from live article signal density ──────────
+function updateModelFromLiveFeed(incidents){
+  const n = incidents.length || 1;
+  const highCount    = incidents.filter(i => i.sev==='High').length;
+  const militaryCount= incidents.filter(i => i.cat==='Military'||i.cat==='Naval').length;
+  const oilCount     = incidents.filter(i => i.cat==='Economics').length;
+  const proxyCount   = incidents.filter(i => i.cat==='Proxy').length;
+
+  // Drive prediction model inputs from real article density
+  currentInputs.negSent    = clamp(35 + (highCount/n)*65,       20, 90);
+  currentInputs.escKw      = clamp(20 + (militaryCount/n)*80,   10, 90);
+  currentInputs.commShock  = clamp(15 + (oilCount/n)*80,        5,  85);
+  currentInputs.proxyOps   = clamp(3  + proxyCount*2,           0,  20);
+  currentInputs.crisisProb = clamp(10 + (highCount/n)*70,       5,  85);
+  currentInputs.airOps     = clamp(4  + (militaryCount/n)*20,   0,  28);
+  currentInputs.spikeRatio = clamp(0.8+ (n/15)*3.5,             0.5, 6);
+
+  updateOverview(); // Refresh all model outputs
+}
+
+// ── Live status indicator ────────────────────────────────────────────────────
+function setFeedStatus(status){
+  feedStatus = status;
+  const dot   = document.getElementById('map-live-dot');
+  const label = document.getElementById('map-live-label');
+  const badge = document.getElementById('map-feed-badge');
+  if(!dot) return;
+  const cfg = {
+    live:      { color:'var(--green)', text:'Live Feed',  badge:'LIVE'},
+    loading:   { color:'var(--amber)', text:'Fetching…',  badge:'LOADING'},
+    simulated: { color:'var(--amber)', text:'Simulated',  badge:'SIMULATED'},
+    error:     { color:'var(--red)',   text:'Feed Error', badge:'ERROR'},
+  };
+  const c = cfg[status]||cfg.error;
+  dot.style.background = c.color;
+  const fdot = document.getElementById('feed-live-dot');
+  if(fdot) fdot.style.background = c.color;
+  if(label) label.textContent = c.text;
+  if(badge) badge.textContent  = c.badge;
+  const lu = document.getElementById('feed-last-update');
+  if(lu) lu.textContent = status==='live'
+    ? 'Updated '+new Date().toLocaleTimeString()
+    : status==='simulated' ? 'Fallback data · No live feed'
+    : status==='loading'   ? 'Fetching live data…' : 'Fetch error — retrying';
+}
+
+// ── Refresh ticker with latest live headlines ─────────────────────────────────
+function buildTicker(){
+  const items = liveIncidents.slice(0,12).map(i =>
+    `<div class="tick-event"><span>[${i.layer}]</span> ${i.headline} · ${i.loc} · ${i.ago} ago</div>`
+  );
+  const doubled = [...items,...items]; // duplicate for seamless scroll
+  const el = document.getElementById('tick-inner');
+  if(el) el.innerHTML = doubled.join('');
+}
+
+const SEV_COLOR={High:'#ef4444', Medium:'#f59e0b', Normal:'#10b981'};
+const SEV_ORDER={High:3,Medium:2,Normal:1};
+
+let gipMap=null, mapMarkers=[], activeIncident=null;
+let feedFilter={region:'All', cat:'All', sev:{High:true,Medium:true,Normal:true}, search:''};
+let activeEvidenceTab='iran';
+
+let liveRefreshTimer = null;
+
+function initMapView(){
+  if(!gipMap){
+    gipMap = L.map('gip-map',{zoomControl:false}).setView([28,48],5);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+      attribution:'©OpenStreetMap ©CartoDB',maxZoom:18
+    }).addTo(gipMap);
+    L.control.zoom({position:'topleft'}).addTo(gipMap);
+
+    // Show fallback data immediately while live fetch runs
+    renderMapMarkers();
+    renderFeed();
+    renderIntelPanel();
+
+    // Kick off live fetch right away
+    fetchLiveIntelligence();
+
+    // Auto-refresh every 90 seconds
+    if(liveRefreshTimer) clearInterval(liveRefreshTimer);
+    liveRefreshTimer = setInterval(()=>{
+      fetchLiveIntelligence();
+      updateMapTime();
+    }, 90000);
+  } else {
+    // Map already inited — just refresh data
+    fetchLiveIntelligence();
+  }
+}
+
+function renderMapMarkers(){
+  mapMarkers.forEach(m=>m.remove());
+  mapMarkers=[];
+  const visible=getVisibleIncidents();
+  visible.forEach(inc=>{
+    const col=SEV_COLOR[inc.sev];
+    const marker=L.circleMarker([inc.lat,inc.lng],{
+      radius: inc.sev==='High'?10:inc.sev==='Medium'?7:5,
+      fillColor:col, color:'#000', weight:1.5, opacity:.9, fillOpacity:.75
+    }).addTo(gipMap);
+    marker.bindTooltip(`<div style="font-size:11px;font-weight:600;color:#f1f5f9;background:#0d1526;border:1px solid #1e3050;padding:5px 9px;border-radius:5px">${inc.loc} · <span style="color:${col}">${inc.sev}</span><br><span style="color:#94a3b8;font-weight:400">${inc.headline.slice(0,55)}…</span></div>`,
+      {className:'gip-tip',direction:'top',permanent:false,opacity:1});
+    marker.on('click',()=>selectIncident(inc.id));
+    mapMarkers.push(marker);
+  });
+}
+
+function getVisibleIncidents(){
+  return liveIncidents.filter(inc=>{
+    if(feedFilter.region!=='All' && inc.region!==feedFilter.region) return false;
+    if(feedFilter.cat!=='All' && inc.cat!==feedFilter.cat) return false;
+    if(!feedFilter.sev[inc.sev]) return false;
+    if(feedFilter.search && !inc.headline.toLowerCase().includes(feedFilter.search.toLowerCase()) && !inc.loc.toLowerCase().includes(feedFilter.search.toLowerCase())) return false;
+    return true;
+  });
+}
+
+function renderFeed(){
+  const incidents=getVisibleIncidents();
+  document.getElementById('feed-count').textContent=incidents.length+' incidents';
+  document.getElementById('feed-list').innerHTML=incidents.map(inc=>{
+    const col=SEV_COLOR[inc.sev];
+    const isActive=inc.id===activeIncident;
+    return `<div class="inc-card ${isActive?'inc-active':''}" onclick="selectIncident(${inc.id})">
+      <div class="inc-header">
+        <span class="inc-loc">${inc.loc} · <span style="color:var(--text3)">${inc.ago} ago</span></span>
+        <span class="inc-sev" style="background:${col}22;color:${col};border:1px solid ${col}44">${inc.sev}</span>
+      </div>
+      <div class="inc-headline">${inc.headline}</div>
+      <div class="inc-meta">
+        <span style="color:var(--text3)">${inc.src}</span>
+        <span class="inc-tier" style="color:${inc.tier===1?'var(--cyan)':inc.tier===2?'var(--amber)':'var(--text3)'}">TIER-${inc.tier}</span>
+      </div>
+      <div class="inc-bar"><div style="width:${inc.rel}%;height:100%;background:${col};border-radius:2px;opacity:.7"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function selectIncident(id){
+  activeIncident=id;
+  const inc=INCIDENTS.find(i=>i.id===id);
+  if(inc && gipMap){
+    gipMap.setView([inc.lat,inc.lng],7,{animate:true});
+  }
+  renderFeed();
+  renderIntelPanel(inc);
+  renderMapMarkers();
+}
+
+function renderIntelPanel(focus){
+  renderEvidenceGraph();
+  renderEscalationPath();
+  renderRecommendedActions();
+  if(focus) renderIncidentDetail(focus);
+}
+
+function renderEvidenceGraph(){
+  const p=getBaselinePreds();
+  const tabs=['iran','us','ship'];
+  const tabNames={'iran':'Iran-linked strike','us':'US escalation','ship':'shipping disruption'};
+
+  document.getElementById('ev-tabs').innerHTML=tabs.map(t=>
+    `<span class="ev-tab ${t===activeEvidenceTab?'ev-tab-active':''}" onclick="setEvidenceTab('${t}')">${tabNames[t]}</span>`
+  ).join('');
+
+  const d=XAI_DATA[activeEvidenceTab];
+  document.getElementById('ev-list').innerHTML=d.evidence.map(e=>`
+    <div class="ev-item">
+      <div class="ev-headline">${e.headline}</div>
+      <div class="ev-source">${e.source} · relevance ${e.score}</div>
+    </div>`).join('');
+}
+
+function setEvidenceTab(t){
+  activeEvidenceTab=t;
+  renderEvidenceGraph();
+}
+
+function renderEscalationPath(){
+  const p=getBaselinePreds();
+  const f=computeFeatures(currentInputs);
+  const chain=CHAINS[0].steps.slice(0,3);
+  let cumP=100;
+  document.getElementById('esc-path').innerHTML=chain.map((s,i)=>{
+    if(i>0) cumP=Math.round(cumP*(s.chain/100));
+    const arrow=i<chain.length-1?`<div style="font-size:9px;color:var(--text3);padding:2px 0 2px 20px">↓ ${CHAINS[0].steps[i+1].chain}% → ETA ${CHAINS[0].steps[i+1].eta}</div>`:'';
+    return `<div style="font-size:10px;color:var(--text2);padding:3px 0">${i+1}. <span style="color:var(--text1)">${s.event}</span> <span style="color:var(--cyan);float:right">${s.chain===100?'Trigger':s.chain+'%'}</span></div>${arrow}`;
+  }).join('');
+  document.getElementById('esc-prob').textContent='Path probability '+(CHAINS[0].steps[2].chain)+'%';
+}
+
+function renderRecommendedActions(){
+  const r=computeRisk(currentInputs);
+  const p=getBaselinePreds();
+  const actions=[
+    {title:'Raise regional alert posture', body:`Escalation probabilities (Iran ${p.iran.p50.toFixed(1)}%, US ${p.us.p50.toFixed(1)}%) exceed watch threshold.`, priority:p.iran.p50>40?'high':'medium'},
+    {title:'Focus intelligence collection on peak window', body:'Projected peak risk window is around next 65h.', priority:'medium'},
+    {title:'Track projected event chain', body:'3 linked transitions currently dominate propagation.', priority:'medium'},
+  ];
+  const pri={high:'var(--red)',medium:'var(--amber)',low:'var(--green)'};
+  document.getElementById('rec-actions').innerHTML=actions.map(a=>`
+    <div class="rec-action">
+      <div class="rec-title">${a.title}</div>
+      <div class="rec-body">${a.body}</div>
+      <div style="font-size:9px;color:${pri[a.priority]};text-transform:uppercase;letter-spacing:.08em;margin-top:4px">Priority: ${a.priority}</div>
+    </div>`).join('');
+}
+
+function renderIncidentDetail(inc){
+  const col=SEV_COLOR[inc.sev];
+  const detailEl=document.getElementById('inc-detail');
+  if(detailEl){
+    detailEl.innerHTML=`
+      <div class="rec-action" style="border-color:${col}44;background:${col}08">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:9px;font-weight:700;color:${col};text-transform:uppercase">${inc.sev} · TIER-${inc.tier}</span>
+          <span style="font-size:9px;color:var(--text3)">${inc.ago} ago</span>
+        </div>
+        <div style="font-size:11px;font-weight:700;color:var(--text1);margin-bottom:4px">${inc.headline}</div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:6px">${inc.desc}</div>
+        <div style="font-size:9px;color:var(--text3)">Source: ${inc.src} · Layer: ${inc.layer} · Relevance: ${inc.rel}</div>
+      </div>`;
+    detailEl.style.display='block';
+  }
+}
+
+function applyFeedFilters(){
+  feedFilter.search=document.getElementById('feed-search').value;
+  feedFilter.region=document.getElementById('feed-region').value;
+  feedFilter.cat=document.getElementById('feed-cat').value;
+  renderFeed();
+  renderMapMarkers();
+}
+
+function toggleSev(s){
+  feedFilter.sev[s]=!feedFilter.sev[s];
+  const btn=document.getElementById('sev-'+s);
+  if(btn) btn.style.opacity=feedFilter.sev[s]?'1':'0.35';
+  renderFeed();
+  renderMapMarkers();
+}
+</script>
+</body>
+</html>
